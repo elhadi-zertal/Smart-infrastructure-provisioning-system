@@ -113,15 +113,31 @@ W_RAM = float(os.getenv("W_RAM", "0.35"))
 W_IO  = float(os.getenv("W_IO",  "0.15"))
 W_E   = float(os.getenv("W_E",   "0.15"))
 
-# Prometheus — for reading actual per-VM energy consumption
-# Set PROMETHEUS_URL to enable; leave empty to fall back to the static estimate.
-# The queries must return a vector with a "vmid" label on every result.
-#   Example (Kepler):  sum by (vm_id) (kepler_vm_core_joules_total)
-#   Example (custom):  vm_energy_watts{job="proxmox"}
-PROMETHEUS_URL      = os.getenv("PROMETHEUS_URL", "")         # e.g. "http://prometheus:9090"
-VM_ENERGY_QUERY     = os.getenv("VM_ENERGY_QUERY",  "vm_energy_watts")
-LXC_ENERGY_QUERY    = os.getenv("LXC_ENERGY_QUERY", "lxc_energy_watts")
-PROMETHEUS_VMID_LABEL = os.getenv("PROMETHEUS_VMID_LABEL", "vmid")  # label that carries the vmid
+# Prometheus — actual per-VM resource consumption
+# Set PROMETHEUS_URL to enable; leave empty to fall back to static Proxmox estimates.
+#
+# Each query must return an instant vector with a label identifying the VM
+# (PROMETHEUS_VMID_LABEL, default "vmid").  Examples using node_exporter /
+# a custom exporter on each VM:
+#
+#   VM_CPU_QUERY    = avg by (vmid) (rate(node_cpu_seconds_total{mode!="idle"}[1m])) * <cores>
+#   VM_RAM_QUERY    = node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes  (labelled by vmid)
+#   VM_IO_QUERY     = rate(node_disk_read_bytes_total[1m]) + rate(node_disk_written_bytes_total[1m])
+#   VM_ENERGY_QUERY = vm_energy_watts   (from Kepler, scaphandre, or a custom collector)
+#
+# All four queries are optional independently — any metric not configured
+# falls back to the Proxmox API estimate.
+PROMETHEUS_URL        = os.getenv("PROMETHEUS_URL", "")      # e.g. "http://prometheus:9090"
+PROMETHEUS_VMID_LABEL = os.getenv("PROMETHEUS_VMID_LABEL", "vmid")
+VM_CPU_QUERY          = os.getenv("VM_CPU_QUERY",    "")     # → cores actually in use (float)
+VM_RAM_QUERY          = os.getenv("VM_RAM_QUERY",    "")     # → bytes actually used
+VM_IO_QUERY           = os.getenv("VM_IO_QUERY",     "")     # → bytes/s (read + write)
+VM_ENERGY_QUERY       = os.getenv("VM_ENERGY_QUERY", "")     # → watts
+
+# Node-level IO capacity (bytes/s).  Used as the denominator for IO ΔX.
+# Set to the measured max throughput of your storage backend.
+# Default: 500 MB/s (typical SATA SSD).
+NODE_IO_CAPACITY_BPS = float(os.getenv("NODE_IO_CAPACITY_BPS", str(500 * 1024 * 1024)))
 
 # Rolling history of observed ΔX values — used to compute a stable σ
 # for z-score normalisation instead of the cross-sectional σ across nodes.
@@ -162,56 +178,90 @@ except Exception as _kube_exc:
     logger.warning(f"Kubernetes client not available: {_kube_exc}")
 
 # ─────────────────────────────────────────────
-#  Prometheus — actual per-VM energy fetch
+#  Prometheus — actual per-VM metrics fetch
 # ─────────────────────────────────────────────
-def fetch_vm_energy_from_prometheus() -> dict[str, float]:
+
+# Internal mapping: field name stored on VM dict → (env query string, unit note)
+_PROMETHEUS_METRICS: list[tuple[str, str]] = [
+    ("cpu_actual",    VM_CPU_QUERY),     # cores in use       (float)
+    ("ram_actual",    VM_RAM_QUERY),     # bytes used         (float)
+    ("io_actual",     VM_IO_QUERY),      # bytes/s read+write (float)
+    ("energy_actual", VM_ENERGY_QUERY),  # watts              (float)
+]
+
+
+def _prometheus_instant_query(query: str) -> dict[str, float]:
     """
-    Queries the Prometheus HTTP API for actual per-VM / per-LXC energy
-    consumption in watts.
+    Run a single Prometheus instant-vector query.
+    Returns {vmid_str: float_value}.
+    Logs a throttled warning and returns {} on any failure.
+    """
+    encoded = urllib.parse.quote(query)
+    url     = f"{PROMETHEUS_URL}/api/v1/query?query={encoded}"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=PROXMOX_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode())
 
-    Returns {vmid_str: watts}  e.g. {"152": 87.4, "201": 43.1}
+        if data.get("status") != "success":
+            _throttled_warning(
+                f"prometheus:query:{query[:40]}",
+                f"Prometheus non-success for query '{query}': {data.get('status')}",
+            )
+            return {}
 
-    Runs in a thread (called via asyncio.to_thread from poll_cluster).
-    Returns an empty dict — and logs a throttled warning — if Prometheus
-    is unreachable or misconfigured, so the rest of the poll continues.
+        result: dict[str, float] = {}
+        for item in data.get("data", {}).get("result", []):
+            vmid = item["metric"].get(PROMETHEUS_VMID_LABEL)
+            if vmid is None:
+                continue
+            try:
+                result[str(vmid)] = float(item["value"][1])
+            except (IndexError, ValueError):
+                pass
+        return result
+
+    except Exception as e:
+        _throttled_warning(
+            f"prometheus:query:{query[:40]}",
+            f"Could not reach Prometheus for query '{query}': {e}",
+        )
+        return {}
+
+
+def fetch_vm_metrics_from_prometheus() -> dict[str, dict[str, float]]:
+    """
+    Fetches all configured per-VM metrics from Prometheus in parallel
+    (one thread per metric query via ThreadPoolExecutor).
+
+    Returns a nested dict:
+        {
+            "cpu_actual":    {"152": 1.4,  "201": 0.3},
+            "ram_actual":    {"152": 2.1e9, ...},
+            "io_actual":     {"152": 45e6,  ...},
+            "energy_actual": {"152": 87.4,  ...},
+        }
+
+    Any metric whose query string is empty/unconfigured is skipped entirely
+    (the caller falls back to Proxmox API estimates for that field).
+    Runs in a thread — called via asyncio.to_thread() from poll_cluster.
     """
     if not PROMETHEUS_URL:
         return {}
 
-    results: dict[str, float] = {}
+    active = [(field, q) for field, q in _PROMETHEUS_METRICS if q]
+    if not active:
+        return {}
 
-    for query in (VM_ENERGY_QUERY, LXC_ENERGY_QUERY):
-        encoded = urllib.parse.quote(query)
-        url     = f"{PROMETHEUS_URL}/api/v1/query?query={encoded}"
-        try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=PROXMOX_TIMEOUT) as resp:
-                data = json.loads(resp.read().decode())
+    collected: dict[str, dict[str, float]] = {}
 
-            if data.get("status") != "success":
-                _throttled_warning(
-                    f"prometheus:energy:{query}",
-                    f"Prometheus returned non-success status for query '{query}': {data.get('status')}",
-                )
-                continue
+    with ThreadPoolExecutor(max_workers=len(active)) as pool:
+        futures = {pool.submit(_prometheus_instant_query, q): field for field, q in active}
+        for future in as_completed(futures):
+            field = futures[future]
+            collected[field] = future.result()
 
-            for item in data.get("data", {}).get("result", []):
-                vmid = item["metric"].get(PROMETHEUS_VMID_LABEL)
-                if vmid is None:
-                    continue
-                try:
-                    # Prometheus instant-vector value: [timestamp, "value_string"]
-                    results[str(vmid)] = float(item["value"][1])
-                except (IndexError, ValueError):
-                    pass
-
-        except Exception as e:
-            _throttled_warning(
-                f"prometheus:energy:{query}",
-                f"Could not fetch energy from Prometheus (query='{query}'): {e}",
-            )
-
-    return results
+    return collected
 class AlertSeverity(Enum):
     WARNING  = "warning"
     CRITICAL = "critical"
@@ -461,42 +511,58 @@ async def poll_cluster() -> None:
     Blocking I/O is offloaded to threads via asyncio.to_thread() so the event
     loop is never frozen, and FastAPI request handlers stay responsive.
 
-    Extra steps vs. a plain poll:
-      1. Fetch actual per-VM energy from Prometheus (if configured).
-      2. Enrich each VM/LXC entry with `energy_actual` (watts) and update
-         node `energy_used` to the sum of real VM watts on that node.
-      3. Record all (vm, node) ΔX observations into _delta_history so that
-         _zscore_normalize can use a stable historical σ.
+    Extra steps:
+      1. Fetch actual per-VM CPU / RAM / IO / energy from Prometheus (parallel
+         with the Proxmox + k8s polls).
+      2. Enrich each VM/LXC entry with the four `*_actual` fields.
+      3. Recompute per-node aggregates (energy_used, io_used) from real data
+         when available, so node-level feasibility checks use measured values.
+      4. Record all (vm, node) ΔX observations into _delta_history.
     """
     global cluster_state
     try:
-        proxmox, k8s_deps, energy_data = await asyncio.gather(
+        proxmox, k8s_deps, prom_metrics = await asyncio.gather(
             asyncio.to_thread(fetch_proxmox_state),
             asyncio.to_thread(fetch_kubernetes_state),
-            asyncio.to_thread(fetch_vm_energy_from_prometheus),
+            asyncio.to_thread(fetch_vm_metrics_from_prometheus),
         )
 
-        # ── Enrich VMs / LXCs with actual energy ─────────────────────────────
-        # Also recompute each node's energy_used as the sum of measured VM watts
-        # on that node — more accurate than the CPU/RAM estimate when real data
-        # is available.
-        node_actual_energy: dict[str, float] = {}  # node_name → total watts
+        # ── Enrich VMs / LXCs with real Prometheus metrics ───────────────────
+        # prom_metrics = {"cpu_actual": {vmid: val}, "ram_actual": {...}, ...}
+        # We also accumulate per-node totals to replace the estimated aggregates.
+        node_energy_sum: dict[str, float] = {}   # node → watts
+        node_io_sum:     dict[str, float] = {}   # node → bytes/s
 
         for kind in ("vms", "lxc"):
             for vmid, vm in proxmox[kind].items():
-                actual = energy_data.get(str(vmid))
-                if actual is not None:
-                    vm["energy_actual"] = actual
-                    node = vm.get("node")
-                    if node:
-                        node_actual_energy[node] = node_actual_energy.get(node, 0.0) + actual
+                vmid_str = str(vmid)
+                node     = vm.get("node")
 
-        # Replace estimated energy_used with real summed watts where we have data
-        for node_name, watts in node_actual_energy.items():
+                for field, per_vm in prom_metrics.items():
+                    val = per_vm.get(vmid_str)
+                    if val is not None:
+                        vm[field] = val
+
+                # Accumulate node-level totals from real data
+                if node:
+                    energy = vm.get("energy_actual")
+                    if energy is not None:
+                        node_energy_sum[node] = node_energy_sum.get(node, 0.0) + energy
+
+                    io = vm.get("io_actual")
+                    if io is not None:
+                        node_io_sum[node] = node_io_sum.get(node, 0.0) + io
+
+        # Push real node-level aggregates back into the state
+        for node_name, watts in node_energy_sum.items():
             if node_name in proxmox["nodes"]:
                 proxmox["nodes"][node_name]["energy_used"] = watts
 
-        # ── Update delta history (background — never blocks scaling) ──────────
+        for node_name, bps in node_io_sum.items():
+            if node_name in proxmox["nodes"]:
+                proxmox["nodes"][node_name]["io_used"] = bps
+
+        # ── Update delta history ──────────────────────────────────────────────
         _update_delta_history(proxmox)
 
         # ── Log Proxmox diffs ─────────────────
@@ -575,32 +641,55 @@ def _update_delta_history(state: dict) -> None:
 def _compute_raw_deltas(vm: dict, nodes: dict) -> dict[str, dict[str, float]]:
     """
     For every online candidate node compute raw ΔX values:
-        ΔX = resource_needed_by_vm − resource_available_on_node
+        ΔX = resource_actually_used_by_vm − resource_still_available_on_node
 
-    Negative ΔX → node has a surplus (feasible).
-    Positive ΔX → node is overloaded (infeasible, rejected later).
+    Negative ΔX → node has enough headroom (feasible).
+    Positive ΔX → node would be overloaded (infeasible, rejected by calculate_fitness).
 
-    Energy source priority:
-        1. vm["energy_actual"]  — real watts from Prometheus (preferred)
-        2. vm["energy_needed"]  — static estimate (fallback)
+    Metric sources — real Prometheus data preferred, Proxmox API as fallback:
+
+        CPU  : vm["cpu_actual"]    (cores in use)
+               └─ fallback: vm["cores"] * vm["cpu"] if cpu ratio present, else vm["cores"]
+        RAM  : vm["ram_actual"]    (bytes used)
+               └─ fallback: vm["maxmem"] * vm["mem"] ratio, else vm["maxmem"]
+        IO   : vm["io_actual"]     (bytes/s read+write)
+               └─ fallback: 0.0   (Proxmox API does not expose per-VM IO throughput)
+        Energy: vm["energy_actual"] (watts)
+               └─ fallback: vm["energy_needed"] (static cores×50W + mem×10W estimate)
+
+    Node available resources:
+
+        CPU  : maxcpu × (1 − cpu_ratio)       — from Proxmox node status
+        RAM  : maxmem − mem                   — from Proxmox node status
+        IO   : NODE_IO_CAPACITY_BPS − io_used — io_used summed from real VM data
+        Energy: energy_capacity − energy_used — energy_used from real VM data when available
     """
-    vm_cores  = vm.get("cores", 1)
-    vm_mem_gb = vm.get("maxmem", 0) / (1024 ** 3)
-    # Prefer measured watts; fall back to static estimate
-    vm_energy = vm.get("energy_actual", vm.get("energy_needed", 0))
+    # ── VM demand (real data > Proxmox estimate) ─────────────────────────────
+    vm_cpu = vm.get(
+        "cpu_actual",
+        vm.get("cores", 1) * vm.get("cpu", 1.0),   # cpu ratio × allocated cores
+    )
+    vm_ram = vm.get(
+        "ram_actual",
+        vm.get("maxmem", 0) * vm.get("mem", 1.0) if vm.get("mem") else vm.get("maxmem", 0),
+    )
+    vm_io     = vm.get("io_actual",     0.0)
+    vm_energy = vm.get("energy_actual", vm.get("energy_needed", 0.0))
 
     deltas: dict[str, dict[str, float]] = {}
     for name, info in nodes.items():
         if not info or info.get("status") != "online":
             continue
-        cpu_avail = info["maxcpu"] * (1.0 - info.get("cpu", 0))
-        ram_avail = (info["maxmem"] - info.get("mem", 0)) / (1024 ** 3)
-        e_avail   = info["energy_capacity"] - info.get("energy_used", 0)
+
+        cpu_avail = info["maxcpu"] * (1.0 - info.get("cpu", 0.0))
+        ram_avail = info["maxmem"] - info.get("mem", 0)
+        io_avail  = NODE_IO_CAPACITY_BPS - info.get("io_used", 0.0)
+        e_avail   = info["energy_capacity"] - info.get("energy_used", 0.0)
 
         deltas[name] = {
-            "cpu":    vm_cores  - cpu_avail,
-            "ram":    vm_mem_gb - ram_avail,
-            "io":     0.0,        # disk/network IO not tracked at node level yet
+            "cpu":    vm_cpu    - cpu_avail,
+            "ram":    vm_ram    - ram_avail,
+            "io":     vm_io     - io_avail,
             "energy": vm_energy - e_avail,
         }
     return deltas
