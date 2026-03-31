@@ -1,3 +1,7 @@
+
+
+🌐 **Live:**  [3shiitfhedhmy.ok.kimi.link](https://3shiitfhedhmy.ok.kimi.link/)
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
