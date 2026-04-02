@@ -80,7 +80,7 @@
     <firmware version="1.0.1" persisted_at="1774461726.86" description="Firmware settings">
       <mirror/>
       <flavour/>
-      <plugins/>
+      <plugins>os-net-snmp</plugins>
       <type/>
       <subscription/>
       <reboot>0</reboot>
@@ -151,7 +151,7 @@
       <subnet>24</subnet>
     </opt3>
   </interfaces>
-  <dnsmasq version="1.0.8" persisted_at="1774516985.64" description="Dnsmasq DNS and DHCP">
+  <dnsmasq version="1.0.9" persisted_at="1774803173.84" description="Dnsmasq DNS and DHCP">
     <enable>0</enable>
     <regdhcp>0</regdhcp>
     <regdhcpstatic>0</regdhcpstatic>
@@ -183,6 +183,7 @@
       <default_fw_rules>0</default_fw_rules>
       <reply_delay/>
       <enable_ra>0</enable_ra>
+      <host_ping>1</host_ping>
       <nosync>0</nosync>
       <log_dhcp>0</log_dhcp>
       <log_quiet>0</log_quiet>
@@ -307,6 +308,86 @@
         <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
+    <rule uuid="5c3c7161-becc-4d49-adca-9da0ec1bf3d1">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>nginx-vm &#x2192; vxlans http</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>172.25.5.168</address>
+      </source>
+      <destination>
+        <address>10.0.0.0/8</address>
+        <port>80</port>
+      </destination>
+      <updated>
+        <username>root@172.25.5.83</username>
+        <time>1775048864.82</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.83</username>
+        <time>1775046655.43</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="b8770865-d400-4991-ae47-f5d076a60267">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>nginx-vm &#x2192; vxlans https</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>172.25.5.168</address>
+      </source>
+      <destination>
+        <address>10.0.0.0/8</address>
+        <port>443</port>
+      </destination>
+      <updated>
+        <username>root@172.25.5.83</username>
+        <time>1775048874.61</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.83</username>
+        <time>1775046732.58</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="d3fcddad-37ab-4add-8540-d8440001b644">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>nginx-vm &#x2192; vxlans icmp</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>icmp</protocol>
+      <source>
+        <address>172.25.5.168</address>
+      </source>
+      <destination>
+        <address>10.0.0.0/8</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.83</username>
+        <time>1775048889.49</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.83</username>
+        <time>1775046802.85</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
     <rule uuid="2aba98d2-5957-483b-830d-7be42d993537">
       <type>pass</type>
       <interface>wan</interface>
@@ -383,6 +464,139 @@
       <created>
         <username>root@172.25.5.30</username>
         <time>1774773170.45</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="4be15f78-d636-4bb3-9f7b-9f3c2dac29d0">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>prometheus rule</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>172.25.5.0/24</address>
+      </source>
+      <destination>
+        <address>10.30.30.100</address>
+        <port>9090</port>
+      </destination>
+      <updated>
+        <username>root@172.25.5.30</username>
+        <time>1775050221.44</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774789626.20</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="6b8bc39e-01dc-436e-a01f-f95e78d7f83b">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>LB to VXLANS http</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>172.25.5.26/24</address>
+      </source>
+      <destination>
+        <address>10.0.0.0/8</address>
+        <port>80</port>
+      </destination>
+      <updated>
+        <username>root@172.25.5.30</username>
+        <time>1774973279.91</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774971324.68</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="9d050a01-02e6-4d1f-82b2-2d46e2918e7c">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>LB to VXLANS hhtps</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>172.25.5.26</address>
+      </source>
+      <destination>
+        <address>10.0.0.0/8</address>
+        <port>443</port>
+      </destination>
+      <updated>
+        <username>root@172.25.5.30</username>
+        <time>1774972704.47</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774972704.47</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="d0071706-2c05-4d69-812e-2cdd202cfa42">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <direction>in</direction>
+      <category>LB ICMP to VXLANS</category>
+      <quick>1</quick>
+      <protocol>icmp</protocol>
+      <source>
+        <address>172.25.5.0/24</address>
+      </source>
+      <destination>
+        <address>10.10.10.0/24</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.94</username>
+        <time>1775038137.08</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774972779.96</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="c7da104c-b40a-40bd-94d1-5db83bf1bfb2">
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>kube port</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>172.25.5.0/24</address>
+      </source>
+      <destination>
+        <address>10.10.10.0/24</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.94</username>
+        <time>1775038151.57</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1775035379.57</time>
         <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
@@ -534,6 +748,32 @@
         <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
+    <rule uuid="5d3b12c9-4a17-41b2-9339-7a59b5b0bbf1">
+      <type>pass</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>allow response back to LB</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>10.10.10.0/24</address>
+      </source>
+      <destination>
+        <address>172.25.5.26</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.30</username>
+        <time>1774972886.57</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774972886.57</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
     <rule uuid="d373293b-adbf-46d3-a5c0-669481397a5d">
       <type>pass</type>
       <interface>opt2</interface>
@@ -655,6 +895,32 @@
       <created>
         <username>root@172.25.5.30</username>
         <time>1774774137.25</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="134066c4-ea54-4986-a731-0f0b05d9f8fa">
+      <type>pass</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>allow response back to LB</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>10.20.20.0/24</address>
+      </source>
+      <destination>
+        <address>172.25.5.26</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.30</username>
+        <time>1774972972.68</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774972972.68</time>
         <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
@@ -782,6 +1048,57 @@
         <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
+    <rule uuid="51f0eefc-a352-4c27-9ff7-6b78f5e50bd9">
+      <type>pass</type>
+      <interface>opt3</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>allow response back to LB</descr>
+      <direction>in</direction>
+      <quick>1</quick>
+      <protocol>tcp</protocol>
+      <source>
+        <address>10.30.30.0/24</address>
+      </source>
+      <destination>
+        <address>172.25.5.26</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.30</username>
+        <time>1774973008.92</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.30</username>
+        <time>1774973008.92</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="ba48c7a3-8816-4041-b5cb-de11840f9210">
+      <type>pass</type>
+      <interface>opt3</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>monitor to nginx</descr>
+      <direction>out</direction>
+      <quick>1</quick>
+      <source>
+        <address>10.30.30.0/24</address>
+      </source>
+      <destination>
+        <address>172.25.5.168</address>
+      </destination>
+      <updated>
+        <username>root@172.25.5.83</username>
+        <time>1775055459.68</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@172.25.5.83</username>
+        <time>1775055459.68</time>
+        <description>/firewall_rules_edit.php made changes</description>
+      </created>
+    </rule>
   </filter>
   <rrd>
     <enable/>
@@ -791,8 +1108,8 @@
   </ntpd>
   <revision>
     <username>root@172.25.5.30</username>
-    <description>/api/kea/dhcpv4/set made changes</description>
-    <time>1774784039.01</time>
+    <description>/api/firewall/filter/toggle_rule/1ad15082-bfd5-455d-bc83-28ea7dcd0bd8 made changes</description>
+    <time>1775059364.28</time>
   </revision>
   <OPNsense>
     <wireguard>
@@ -917,11 +1234,130 @@
         </geoip>
         <aliases/>
       </Alias>
-      <Category version="1.0.0" persisted_at="1774461727.30" description="Firewall categories">
-        <categories/>
+      <Category version="1.0.0" persisted_at="1774972779.96" description="Firewall categories">
+        <categories>
+          <category uuid="1499da29-6152-4cc8-a0e7-06c2082c4e21">
+            <name>LB ICMP to VXLANS</name>
+            <auto>1</auto>
+            <color/>
+          </category>
+        </categories>
       </Category>
-      <Filter version="1.0.4" persisted_at="1774461727.37" description="Firewall rules (new)">
-        <rules/>
+      <Filter version="1.0.4" persisted_at="1775059364.28" description="Firewall rules (new)">
+        <rules>
+          <rule uuid="78a49238-39b1-4b70-b42b-f2e496fd1db7">
+            <enabled>1</enabled>
+            <statetype>keep</statetype>
+            <state-policy/>
+            <sequence>700</sequence>
+            <action>pass</action>
+            <quick>1</quick>
+            <interfacenot>0</interfacenot>
+            <interface/>
+            <direction>any</direction>
+            <ipprotocol>inet</ipprotocol>
+            <protocol>any</protocol>
+            <icmptype/>
+            <icmp6type/>
+            <source_net>172.25.5.26</source_net>
+            <source_not>0</source_not>
+            <source_port/>
+            <destination_net>10.0.0.0/8</destination_net>
+            <destination_not>0</destination_not>
+            <destination_port/>
+            <divert-to/>
+            <gateway/>
+            <replyto/>
+            <disablereplyto>0</disablereplyto>
+            <log>0</log>
+            <allowopts>0</allowopts>
+            <nosync>0</nosync>
+            <nopfsync>0</nopfsync>
+            <statetimeout/>
+            <udp-first/>
+            <udp-multiple/>
+            <udp-single/>
+            <max-src-nodes/>
+            <max-src-states/>
+            <max-src-conn/>
+            <max/>
+            <max-src-conn-rate/>
+            <max-src-conn-rates/>
+            <overload/>
+            <adaptivestart/>
+            <adaptiveend/>
+            <prio/>
+            <set-prio/>
+            <set-prio-low/>
+            <tag/>
+            <tagged/>
+            <tcpflags1/>
+            <tcpflags2/>
+            <tcpflags_any>0</tcpflags_any>
+            <categories/>
+            <sched/>
+            <tos/>
+            <shaper1/>
+            <shaper2/>
+            <description/>
+          </rule>
+          <rule uuid="1ad15082-bfd5-455d-bc83-28ea7dcd0bd8">
+            <enabled>1</enabled>
+            <statetype>keep</statetype>
+            <state-policy/>
+            <sequence>900</sequence>
+            <action>pass</action>
+            <quick>1</quick>
+            <interfacenot>0</interfacenot>
+            <interface/>
+            <direction>any</direction>
+            <ipprotocol>inet</ipprotocol>
+            <protocol>any</protocol>
+            <icmptype/>
+            <icmp6type/>
+            <source_net>172.25.5.168</source_net>
+            <source_not>0</source_not>
+            <source_port/>
+            <destination_net>10.0.0.0/8</destination_net>
+            <destination_not>0</destination_not>
+            <destination_port/>
+            <divert-to/>
+            <gateway/>
+            <replyto/>
+            <disablereplyto>0</disablereplyto>
+            <log>0</log>
+            <allowopts>0</allowopts>
+            <nosync>0</nosync>
+            <nopfsync>0</nopfsync>
+            <statetimeout/>
+            <udp-first/>
+            <udp-multiple/>
+            <udp-single/>
+            <max-src-nodes/>
+            <max-src-states/>
+            <max-src-conn/>
+            <max/>
+            <max-src-conn-rate/>
+            <max-src-conn-rates/>
+            <overload/>
+            <adaptivestart/>
+            <adaptiveend/>
+            <prio/>
+            <set-prio/>
+            <set-prio-low/>
+            <tag/>
+            <tagged/>
+            <tcpflags1/>
+            <tcpflags2/>
+            <tcpflags_any>0</tcpflags_any>
+            <categories/>
+            <sched/>
+            <tos/>
+            <shaper1/>
+            <shaper2/>
+            <description>nginx - Vlans</description>
+          </rule>
+        </rules>
         <snatrules/>
         <npt/>
         <onetoone/>
@@ -1015,7 +1451,7 @@
           <http_port>8000</http_port>
         </general>
       </ctrl_agent>
-      <dhcp4 version="1.0.4" persisted_at="1774784039.01" description="Kea DHCPv4 configuration">
+      <dhcp4 version="1.0.4" persisted_at="1774860465.89" description="Kea DHCPv4 configuration">
         <general>
           <enabled>1</enabled>
           <manual_config>0</manual_config>
@@ -1056,8 +1492,14 @@
               <v6_only_preferred/>
               <v4_dnr/>
             </option_data>
+            <option/>
             <match-client-id>1</match-client-id>
             <pools>10.10.10.100-10.10.10.200</pools>
+            <ddns_forward_zone/>
+            <ddns_dns_server/>
+            <ddns_domain_key_name/>
+            <ddns_domain_key_secret/>
+            <ddns_domain_key_algorithm/>
             <description>hostpital</description>
           </subnet4>
           <subnet4 uuid="61880b74-21ee-4000-928b-d4b9af975c22">
@@ -1078,8 +1520,14 @@
               <v6_only_preferred/>
               <v4_dnr/>
             </option_data>
+            <option/>
             <match-client-id>1</match-client-id>
             <pools>10.20.20.100-10.20.20.200</pools>
+            <ddns_forward_zone/>
+            <ddns_dns_server/>
+            <ddns_domain_key_name/>
+            <ddns_domain_key_secret/>
+            <ddns_domain_key_algorithm/>
             <description>minitry</description>
           </subnet4>
           <subnet4 uuid="bb152a3f-9220-4d8a-a0b2-1e0f1ba2f58a">
@@ -1100,12 +1548,19 @@
               <v6_only_preferred/>
               <v4_dnr/>
             </option_data>
+            <option/>
             <match-client-id>1</match-client-id>
             <pools>10.30.30.100-10.30.30.200</pools>
+            <ddns_forward_zone/>
+            <ddns_dns_server/>
+            <ddns_domain_key_name/>
+            <ddns_domain_key_secret/>
+            <ddns_domain_key_algorithm/>
             <description>monitor</description>
           </subnet4>
         </subnets>
         <reservations/>
+        <options/>
         <ha_peers/>
       </dhcp4>
       <dhcp6 version="1.0.0" persisted_at="1774461727.52" description="Kea DHCPv6 configuration">
@@ -1134,6 +1589,13 @@
         <pd_pools/>
         <ha_peers/>
       </dhcp6>
+      <ddns version="1.0.0" persisted_at="1774803174.24" description="Kea Dynamic DNS configuration">
+        <general>
+          <enabled>0</enabled>
+          <server_ip>127.0.0.1</server_ip>
+          <server_port>53001</server_port>
+        </general>
+      </ddns>
     </Kea>
     <monit version="1.0.14" persisted_at="1774461727.53" description="Monit settings">
       <general>
@@ -1377,7 +1839,7 @@
         <MinProtocol_DTLS/>
       </general>
     </trust>
-    <unboundplus version="1.0.13" persisted_at="1774517158.40" description="Unbound configuration">
+    <unboundplus version="1.0.14" persisted_at="1774858035.39" description="Unbound configuration">
       <general>
         <enabled>1</enabled>
         <port>53</port>
@@ -1389,7 +1851,7 @@
         <noarecords>0</noarecords>
         <regdhcp>0</regdhcp>
         <regdhcpdomain/>
-        <regdhcpstatic>0</regdhcpstatic>
+        <regdhcpstatic>1</regdhcpstatic>
         <noreglladdr6>0</noreglladdr6>
         <noregrecords>0</noregrecords>
         <txtsupport>0</txtsupport>
@@ -1450,6 +1912,22 @@
       <hosts/>
       <aliases/>
     </unboundplus>
+    <netsnmp>
+      <user version="1.0.1" persisted_at="1774803300.83" description="Netsnmp user configuration">
+        <users/>
+      </user>
+      <general version="1.0.5" persisted_at="1774804303.57" description="Netsnmp configuration">
+        <enabled>1</enabled>
+        <community>public</community>
+        <syslocation>proxmox-cluster</syslocation>
+        <syscontact>admin</syscontact>
+        <l3visibility>1</l3visibility>
+        <versionoid>0</versionoid>
+        <enableagentx>0</enableagentx>
+        <enableobservium>0</enableobservium>
+        <listen>172.25.5.23,10.30.30.1</listen>
+      </general>
+    </netsnmp>
   </OPNsense>
   <hasync version="1.0.2" persisted_at="1774461726.89" description="HA sync">
     <disablepreempt>0</disablepreempt>
@@ -1591,8 +2069,77 @@
           <description>/firewall_nat_out_edit.php made changes</description>
         </created>
       </rule>
+      <rule>
+        <source>
+          <network>10.0.0.0/8</network>
+        </source>
+        <destination>
+          <address>172.25.5.0/24</address>
+        </destination>
+        <descr>masquerade internal &#x2192; nginx</descr>
+        <category/>
+        <interface>wan</interface>
+        <tag/>
+        <tagged/>
+        <poolopts/>
+        <poolopts_sourcehashkey/>
+        <ipprotocol>inet</ipprotocol>
+        <target/>
+        <targetip_subnet>0</targetip_subnet>
+        <sourceport/>
+        <updated>
+          <username>root@172.25.5.83</username>
+          <time>1775045633.72</time>
+          <description>/firewall_nat_out_edit.php made changes</description>
+        </updated>
+        <created>
+          <username>root@172.25.5.83</username>
+          <time>1775045633.72</time>
+          <description>/firewall_nat_out_edit.php made changes</description>
+        </created>
+      </rule>
       <mode>hybrid</mode>
     </outbound>
+    <rule uuid="eefa3e3e-2917-4f23-9b31-26ba063ac19a">
+      <sequence>200</sequence>
+      <disabled>0</disabled>
+      <nordr>0</nordr>
+      <interface>wan</interface>
+      <ipprotocol/>
+      <protocol>tcp</protocol>
+      <source>
+        <network/>
+        <port/>
+        <not>0</not>
+      </source>
+      <destination>
+        <network>wanip</network>
+        <port>9090</port>
+        <not>0</not>
+      </destination>
+      <target>10.30.30.100</target>
+      <local-port>9090</local-port>
+      <poolopts/>
+      <log>0</log>
+      <category/>
+      <descr>Prometheus gui</descr>
+      <tag/>
+      <tagged/>
+      <nosync>0</nosync>
+      <natreflection/>
+      <pass/>
+      <associated-rule-id/>
+      <created>
+        <username>root</username>
+        <time>1774789111.34</time>
+        <description>/api/api.php made changes</description>
+      </created>
+      <updated>
+        <username>root</username>
+        <time>1775041561.04</time>
+        <description>/api/api.php made changes</description>
+      </updated>
+    </rule>
   </nat>
   <syslog/>
 </opnsense>
