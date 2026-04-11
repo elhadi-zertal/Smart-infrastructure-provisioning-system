@@ -1,0 +1,196 @@
+version: '3.8'
+
+# Define networks first
+networks:
+  app-network:
+    driver: overlay
+    attachable: true
+    # Optional: specify subnet to avoid conflicts
+    # ipam:
+    #   config:
+    #     - subnet: "10.10.0.0/16"
+
+# Define volumes
+volumes:
+  mongo-data:
+    driver: local
+
+# Define secrets (if needed)
+secrets:
+  mongo_root_password:
+    external: true  # Create with: echo "password" | docker secret create mongo_root_password -
+
+services:
+  # MongoDB with proper volume handling
+  mongodb:
+    image: mongo:6.0
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == worker
+        # OR be more specific:
+        # - node.hostname == rose-Lenovo-V14-IIL
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+      # Resource limits
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - target: 27017
+        published: 27017
+        protocol: tcp
+        mode: host  # Direct host mapping for MongoDB
+    networks:
+      - app-network
+    # Optional: Use secrets for passwords
+    # environment:
+    #   MONGO_INITDB_ROOT_USERNAME: root
+    #   MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+    # secrets:
+    #   - mongo_root_password
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # GET Backend Service
+  get_backend:
+    image: my-get-backend:latest
+    # For registry: image: <MASTER_IP>:5000/my-get-backend:latest
+    deploy:
+      mode: replicated
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == worker
+      restart_policy:
+        condition: any
+        delay: 5s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: ingress  # Swarm routing mesh
+    networks:
+      - app-network
+    # Dependencies (Swarm handles this differently)
+    # depends_on:
+    #   - mongodb
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mongodb
+      - DB_PORT=27017
+    healthcheck:
+      test: ["CMD", "node", "-e",
+             "require('http').get('http://localhost:3000/health',
+              res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error',
+              () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    # Optional logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # POST Backend Service
+  modify_backend:
+    image: my-post-backend:latest
+    # For registry: image: <MASTER_IP>:5000/my-post-backend:latest
+    deploy:
+      mode: replicated
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == worker
+      restart_policy:
+        condition: any
+        delay: 5s
+    ports:
+      - target: 3000
+        published: 6000
+        protocol: tcp
+        mode: ingress
+    networks:
+      - app-network
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mongodb
+      - DB_PORT=27017
+    healthcheck:
+      test: ["CMD", "node", "-e",
+             "require('http').get('http://localhost:3000/health',
+              res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error',
+              () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Frontend Service
+  frontend:
+    image: my-frontend:latest
+    # For registry: image: <MASTER_IP>:5000/my-frontend:latest
+    deploy:
+      mode: replicated
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+        # OR spread across all nodes:
+        # preferences:
+        #   - spread: node.labels.zone
+      restart_policy:
+        condition: any
+        delay: 5s
+      update_config:
+        parallelism: 1
+        delay: 10s
+    ports:
+      - target: 3000
+        published: 5000
+        protocol: tcp
+        mode: ingress
+    networks:
+      - app-network
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://get_backend:3000
+      - REACT_APP_MODIFY_API_URL=http://modify_backend:3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s

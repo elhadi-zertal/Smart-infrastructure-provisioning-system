@@ -1,0 +1,299 @@
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: mongo
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 240s
+
+  get_backend1:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend2:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend3:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  
+  get_backend4:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend5:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3005:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend6:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3006:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend7:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3007:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend8:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3008:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend9:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3009:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  
+  get_backend10:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3010:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend11:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3011:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  get_backend12:
+    build:
+      context: ../back_end/get_server
+      dockerfile: Dockerfile
+    ports:
+      - "3012:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  
+  modify_backend1:
+    build:
+      context: ../back_end/post_server
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:6001:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  modify_backend2:
+    build:
+      context: ../back_end/post_server
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:6002:3000"
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', res => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend1:
+    build:
+      context: ../front_end
+      dockerfile: Dockerfile
+    ports:
+      - 127.0.0.1:5001:3000
+    restart: always
+    networks:
+      - app-network
+  
+  frontend2:
+    build:
+      context: ../front_end
+      dockerfile: Dockerfile
+    ports:
+      - 127.0.0.1:5002:3000
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-data:

@@ -1,0 +1,853 @@
+\documentclass[a4paper, 12pt]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{amsmath, amssymb}
+
+\geometry{margin=2.5cm}
+\onehalfspacing
+
+\begin{document}
+
+\chapter{Introduction}
+
+\section{Introduction}
+
+Virtualization and containerization technologies, combined with microservices architecture, have fundamentally transformed modern software development and infrastructure management. Virtualization enables multiple virtual machines (VMs) to run on a single physical server, significantly improving hardware utilization from typical rates of 15–20\% to 70–80\% or higher, thereby reducing hardware costs, power consumption, and data center footprint while enabling backup, cloning, and migration capabilities essential for disaster recovery.
+
+Containerization extends these benefits through lightweight isolation mechanisms. Unlike virtual machines that require full operating systems, containers share the host kernel while maintaining isolated user spaces, allowing hundreds of containers to run on a single host. Docker has revolutionized application packaging by bundling code with dependencies into portable artifacts that run consistently across all environments, eliminating configuration drift and deployment failures. Kubernetes provides enterprise-grade orchestration with automated deployment, scaling, load balancing, and self-healing capabilities.
+
+Microservices architecture decomposes monolithic applications into small, independent services communicating via application programming interfaces (APIs). Each microservice handles specific business capabilities and can be developed, deployed, and scaled independently. This architectural style enables parallel team development without coordination overhead, technology heterogeneity where teams choose optimal tools per service, and multiple daily releases without system-wide deployments. Fault isolation prevents cascading failures, allowing graceful degradation rather than complete outages, while selective scaling optimizes resources by scaling only high-load services.
+
+Operationally, modern container platforms provide automated horizontal scaling based on metrics, self-healing through automatic container restarts and traffic routing, zero-downtime rolling updates with automatic rollback, and declarative Infrastructure as Code (IaC) approaches. Advanced deployment strategies such as blue-green deployments, canary releases, and A/B testing reduce risk and enable data-driven decisions. For business strategy, containerized microservices support hybrid and multi-cloud deployments, providing consistent runtime environments across on-premises and cloud providers, reducing vendor lock-in and enabling workload optimization.
+
+These patterns align with DevOps practices, allowing autonomous teams to own services end-to-end, reducing handoffs and communication overhead. Continuous integration and deployment (CI/CD) pipelines enable rapid iteration essential for competitive advantage. Modern monitoring and distributed tracing tools provide observability for complex distributed systems. While distributed systems introduce complexity, mature tooling including managed Kubernetes services, service meshes, and observability platforms abstract operational challenges. For organizations building or modernizing applications, these technologies provide a proven foundation for scalable, resilient, maintainable software that evolves with business requirements while optimizing infrastructure costs and development velocity.
+
+\section{Advanced Infrastructure}
+
+\subsection{Description of Virtualized and Containerized Environments}
+
+\subsubsection{Virtualization Technology Fundamentals}
+
+Virtualization represents a foundational paradigm shift in computing infrastructure that abstracts physical hardware resources into logical units, enabling multiple isolated computing environments to coexist on a single physical machine. The hypervisor serves as the critical component, sitting between physical hardware and virtual machines to manage resource allocation and maintain isolation. Two primary types exist: Type 1 hypervisors such as VMware ESXi, Microsoft Hyper-V, and Xen run directly on hardware without a host operating system, providing superior performance for production environments. Type 2 hypervisors including VMware Workstation and VirtualBox run as applications on host operating systems, offering ease of use for development and testing scenarios.
+
+Virtual machines represent complete computing environments with virtualized processors, memory, storage, and network interfaces. Each VM runs its own operating system, completely isolated from others on the same host. The hypervisor manages CPU scheduling and memory allocation, employing sophisticated techniques such as memory ballooning to dynamically reclaim unused memory and page sharing to consolidate identical memory pages across VMs. Storage virtualization abstracts physical storage into logical volumes with features including thin provisioning that allocates storage on demand, snapshots for point-in-time recovery, and live migration capabilities enabling movement of running VMs between physical hosts. Network virtualization creates virtual adapters, switches, and routers implemented entirely in software, enabling complex network topologies without requiring physical network equipment.
+
+Resource management in virtualized environments involves sophisticated scheduling algorithms that optimize hardware utilization. CPU oversubscription allocates more virtual CPUs than physical cores exist, relying on the statistical likelihood that not all VMs will require maximum CPU simultaneously. Memory overcommitment similarly allocates more memory than physically available, utilizing compression and swapping techniques during periods of high demand. Resource pools enable collective management of computational resources, with shares determining relative priority, reservations guaranteeing minimum resources, and limits constraining maximum consumption. These mechanisms allow administrators to implement quality-of-service policies ensuring critical applications receive required resources even under contention.
+
+High availability features distinguish enterprise virtualization platforms from basic hypervisors. VM live migration enables moving running virtual machines between physical hosts without downtime, facilitating hardware maintenance and load balancing. Fault tolerance maintains synchronized copies of VMs on separate hosts, enabling automatic failover within seconds if primary hosts fail. Distributed Resource Scheduler (DRS) continuously monitors cluster resource utilization, automatically migrating VMs to balance workloads and prevent resource exhaustion on individual hosts. These capabilities transform commodity hardware into highly available infrastructure previously requiring specialized equipment.
+
+\subsubsection{Containerization Architecture and Implementation}
+
+Containerization provides an alternative isolation approach that virtualizes at the operating system level rather than the hardware level, enabling fundamentally different performance characteristics and resource efficiency. Containers share the host kernel while maintaining isolated user spaces through kernel features, achieving densities and startup times impossible with traditional virtualization. A single host supporting perhaps a dozen VMs can run hundreds of containers, as containers avoid the overhead of complete operating systems and hypervisor layers.
+
+Linux containers rely on two primary kernel features for isolation and resource management. Namespaces isolate various system aspects: process ID namespaces ensure containers cannot view or signal processes in other containers, network namespaces provide separate network stacks with independent routing tables and firewall rules, mount namespaces isolate filesystem views, user namespaces map container root users to non-privileged host users for security, inter-process communication namespaces isolate message queues and shared memory, and Unix Time-Sharing (UTS) namespaces allow different hostnames per container. Control groups (cgroups) provide resource limitation and accounting, constraining CPU usage, memory allocation, block I/O bandwidth, and network bandwidth per container, preventing any single container from monopolizing host resources.
+
+Union filesystems enable efficient container storage through layered filesystem implementations. Base images containing operating system files and libraries are shared read-only across all containers using that image, dramatically reducing storage requirements and improving cache efficiency. Each container adds a thin writable layer on top of the shared base, with copy-on-write mechanisms ensuring modifications remain isolated while avoiding duplication until changes occur. This layering approach means launching a new container requires only creating a new writable layer, enabling sub-second startup times regardless of image size.
+
+Docker revolutionized containerization by providing a complete platform ecosystem for building, distributing, and running containers. Dockerfiles specify image construction through declarative instructions, creating reproducible builds that eliminate environment-specific configuration issues. The Docker daemon manages container lifecycle operations including creation, starting, stopping, and removal, while exposing APIs for integration with orchestration platforms. Container registries like Docker Hub provide centralized image repositories for distribution, enabling developers to share pre-built images and organizations to maintain private registries for proprietary applications.
+
+Container networking addresses fundamental challenges arising from ephemeral container lifecycles through multiple networking modes. Bridge networking creates virtual network segments with Network Address Translation (NAT) for external connectivity, isolating containers while enabling internet access. Host networking bypasses isolation to share the host's network stack directly, providing maximum performance for network-intensive applications at the cost of reduced isolation. Overlay networks span multiple physical hosts, enabling containers on different machines to communicate as if on the same network segment, essential for distributed applications. Volume management solves data persistence challenges through Docker volumes providing managed storage external to container filesystems, bind mounts enabling development workflows requiring host filesystem access, and volume plugins integrating enterprise storage systems.
+
+\subsubsection{Container Orchestration with Kubernetes}
+
+Kubernetes emerged as the industry standard for container orchestration, providing declarative infrastructure management where administrators specify desired state and the system continuously reconciles actual state toward those specifications. This approach represents a fundamental shift from imperative management where operators manually execute commands to achieve desired configurations. The architecture consists of a control plane managing cluster state and worker nodes running containerized workloads.
+
+The control plane components coordinate all cluster operations. The API server provides the central management interface, exposing RESTful APIs for all cluster interactions and serving as the only component directly accessing the cluster state store. Etcd stores all cluster state in a distributed, strongly consistent key-value store, providing reliable persistence and watch capabilities for change notifications. The scheduler assigns newly created pods to worker nodes based on resource requirements, constraints, affinity specifications, and current cluster utilization. Controller managers run control loops that continuously observe cluster state and make changes to move current state toward desired state, implementing core functionality like replica management, endpoint updates, and service account creation.
+
+Worker nodes execute the actual application workloads. The kubelet agent runs on each node, managing pod lifecycle by ensuring containers described in pod specifications are running and healthy. The container runtime executes containers, with Kubernetes supporting multiple runtimes including Docker, containerd, and CRI-O through a standard interface. Kube-proxy manages network routing, implementing service abstractions by maintaining network rules that enable communication with pods regardless of their current node placement.
+
+Pods represent the smallest deployable units in Kubernetes, encapsulating one or more containers sharing network and storage namespaces. Containers within pods communicate via localhost, share storage volumes, and are scheduled together on the same node. Deployments manage stateless application rollout, providing declarative updates, automated rollbacks on failure, and scaling capabilities. StatefulSets handle stateful applications requiring stable network identities, ordered deployment and scaling, and persistent storage that follows pods across rescheduling. Services provide stable networking endpoints abstracting dynamic pod IP addresses, with built-in load balancing distributing traffic across healthy pods matching label selectors.
+
+Configuration management in Kubernetes separates application code from environment-specific configuration. ConfigMaps store non-sensitive configuration data as key-value pairs or files, enabling the same container images to run across environments with different configurations. Secrets provide similar functionality for sensitive information such as passwords, OAuth tokens, and SSH keys, with additional features including encryption at rest and access controls. Applications consume configurations through environment variables, command-line arguments, or mounted configuration files.
+
+Resource management ensures efficient cluster utilization while preventing resource contention. Resource requests specify minimum guaranteed resources for each container, influencing scheduling decisions to place pods on nodes with sufficient capacity. Resource limits define maximum consumable resources, with enforcement preventing containers from exceeding allocations and impacting other workloads. Quality-of-service classes derive from request and limit configurations, determining eviction priority when nodes experience resource pressure. Horizontal Pod Autoscalers automatically scale deployments based on observed CPU utilization or custom metrics, adding replicas during high load and removing them during low utilization. Namespaces provide logical cluster partitioning, enabling multi-tenancy by isolating resources and allowing independent resource quotas and access controls per namespace. Network policies control pod communication, implementing microsegmentation by specifying which pods can communicate with each other and which external endpoints are accessible.
+
+\subsection{Advanced Development of Microservices and Architectural Comparison}
+
+\subsubsection{Microservices Architecture Principles}
+
+Microservices architecture structures applications as collections of loosely coupled services, each implementing specific business capabilities independently deployable and scalable. This architectural style represents a fundamental departure from monolithic design, distributing functionality across multiple autonomous services communicating through well-defined interfaces. Services maintain independent data stores following the database-per-service pattern, ensuring loose coupling at the data layer and enabling technology diversity where different services can utilize databases optimized for their specific requirements.
+
+Each service team owns the complete service lifecycle including development, deployment, monitoring, and maintenance, fostering ownership and accountability. The bounded context principle from domain-driven design guides service boundary identification, ensuring services encapsulate cohesive business capabilities with clear responsibility boundaries and minimal external dependencies. Properly identified boundaries minimize inter-service communication while maximizing team autonomy, critical factors for microservices success.
+
+Service independence enables independent deployment without coordinating across teams or services, dramatically accelerating release velocity compared to monolithic deployments requiring system-wide coordination. Teams can choose optimal technology stacks for their specific requirements rather than conforming to organization-wide standards. This heterogeneity allows polyglot programming where services use different programming languages, databases, and frameworks based on specific functional and non-functional requirements. Payment processing might utilize strongly-typed languages for correctness guarantees, while recommendation engines might employ machine learning frameworks requiring different runtime environments.
+
+Team autonomy reduces cognitive load, as developers can understand and modify individual services without comprehending entire system architectures. New team members achieve productivity rapidly by focusing on specific service domains rather than learning vast interconnected codebases. This localized understanding enables faster onboarding and reduces coordination overhead across organizational boundaries.
+
+Resilience patterns handle inevitable failures in distributed systems through deliberate design. Circuit breakers prevent cascading failures by detecting failing downstream services and short-circuiting requests, giving failing services time to recover without overwhelming them with additional traffic. Bulkheads isolate resources so failures in one service or component do not consume resources needed elsewhere, preventing localized failures from causing system-wide outages. Retry logic with exponential backoff handles transient failures gracefully by automatically retrying failed operations with increasing delays between attempts. Timeouts prevent indefinite waiting on unresponsive services, ensuring requests fail quickly rather than exhausting resources. These patterns combine to create antifragile systems that improve under stress rather than degrading catastrophically.
+
+\subsubsection{Data Management in Distributed Systems}
+
+Data consistency in microservices requires abandoning traditional ACID transactions spanning multiple services, as distributed transactions introduce coordination overhead incompatible with service independence. The saga pattern coordinates distributed transactions through sequences of local transactions with compensating actions for rollback. Choreography-based sagas use event publishing for loose coupling, while orchestration-based sagas employ central coordinators for better visibility.
+
+Event sourcing stores state changes as immutable event sequences, providing audit trails and temporal queries. Command Query Responsibility Segregation (CQRS) separates read and write models for independent optimization. Event-driven architectures enable eventual consistency where updates propagate asynchronously, accepting temporary inconsistency for availability per the CAP theorem. Data replication balances consistency and availability: strong consistency ensures identical replicas but reduces availability during partitions, while eventual consistency allows divergence for high availability.
+
+\subsubsection{Communication Patterns and Service Integration}
+
+Microservices require robust communication mechanisms for service interaction, with architectural choices profoundly impacting system characteristics. Synchronous Representational State Transfer (REST) APIs provide request-response communication with clear semantics, widespread tooling support, and simple mental models. Services expose HTTP endpoints receiving requests and returning responses, enabling straightforward integration and debugging. However, synchronous communication creates temporal coupling where requesting services must wait for responses, reducing availability when downstream services fail or experience latency. Cascading failures occur when slow services create backpressure throughout the call chain, potentially bringing down entire service graphs.
+
+Asynchronous messaging decouples services temporally, allowing producers to publish messages without waiting for consumer processing. Message brokers such as RabbitMQ, Apache Kafka, or cloud-native services provide reliable message delivery, persistence during consumer downtime, and sophisticated routing capabilities. Event-driven architectures publish domain events that interested services consume, creating loose coupling where publishers remain unaware of their consumers. This approach enables flexible system evolution where new services can begin consuming existing events without modifying producers, and existing consumers can be updated independently without affecting publishers.
+
+Service discovery mechanisms allow services to locate each other dynamically in containerized environments where instances constantly start, stop, and migrate across hosts. Client-side discovery has services query discovery registries like Consul or Eureka to obtain current service locations before making requests. Server-side discovery uses load balancers or API gateways that query registries and route requests, abstracting discovery complexity from clients. Service mesh implementations such as Istio or Linkerd provide sophisticated service-to-service communication through sidecar proxies deployed alongside each service instance, handling discovery, load balancing, circuit breaking, mutual TLS encryption, and observability transparently without requiring application code changes.
+
+API gateways consolidate external access, providing a single entry point for client applications. Gateways handle cross-cutting concerns including authentication, authorization, rate limiting, request routing, response aggregation, and protocol translation. They can aggregate multiple backend service calls into single responses, reducing client complexity and network round trips. Backend for Frontend (BFF) patterns create specialized gateways for different client types such as web applications, mobile applications, and partner APIs, optimizing responses and APIs for specific client requirements and capabilities.
+
+\subsubsection{Comparative Analysis: Monolithic vs Microservices Architecture}
+
+The fundamental architectural choice between monolithic and microservices approaches profoundly impacts development practices, operational complexity, and business outcomes. Monolithic architectures package all functionality into a single deployable unit sharing one codebase, database, and runtime. This offers simplicity: development uses familiar integrated codebases with standard debugging tools, transaction management relies on database ACID properties ensuring consistency, and deployment involves single artifacts using established processes.
+
+Monolithic architectures excel for small teams with limited scale requirements. Shared codebases facilitate code reuse and refactoring. Single databases simplify queries and ensure consistency. Simple deployment reduces operational burden compared to coordinating multiple services. For startups and small teams, monolithic architectures often represent the optimal choice, avoiding complexity that would slow development without commensurate benefits.
+
+However, monolithic architectures encounter limitations as systems grow. Scaling requires replicating entire applications regardless of component load, leading to inefficient resource utilization. Technology choices become embedded, preventing adoption of new tools without complete rewrites. Deployment risk increases with application size, as any change necessitates full redeployment, creating extended testing cycles. Large codebases become difficult to understand as complexity accumulates, reducing development velocity.
+
+Microservices decompose applications into independent services with isolated data stores. This provides scaling flexibility for specific high-load services while maintaining minimal footprints elsewhere, optimizing costs and performance. Technology diversity enables incremental adoption without system-wide migrations. Independent deployment accelerates release velocity, enabling daily deployments without organizational coordination. Fault isolation contains failures, enabling graceful degradation.
+
+However, microservices introduce significant complexity. Distributed challenges include network latency affecting interactions, partial failures requiring deliberate handling, and data consistency across boundaries through complex patterns. Operational overhead increases with monitoring, logging, and tracing requirements. Deployment complexity grows with version management, schema migrations, and backward compatibility. Development complexity includes designing service boundaries, implementing distributed transactions, and reasoning about eventual consistency.
+
+The decision framework considers multiple factors. Team size influences selection: small teams often lack resources for distributed complexity, while large organizations benefit from service autonomy. System scale drives choices: applications with uniform load may not benefit from selective scaling, while those with varying requirements justify microservices complexity. Domain complexity affects decisions: clearly separable capabilities align well with microservices boundaries, while tightly coupled domains suffer from excessive communication. Organizational maturity determines success: microservices demand sophisticated DevOps practices and operational expertise.
+
+\section{Problematic}
+
+Modern software systems face unprecedented demands for scalability, reliability, and rapid deployment in competitive digital markets. Organizations must navigate critical architectural decisions that fundamentally shape technology strategies, development practices, and business outcomes. The choice between traditional monolithic architectures and containerized microservices environments represents a strategic transformation affecting organizational structure, operational processes, infrastructure investments, and competitive positioning.
+
+Traditional monolithic architectures offer development simplicity, straightforward debugging, and simple deployment through single artifacts. However, they encounter fundamental limitations as systems grow: scaling requires replicating entire applications regardless of specific component load, technology choices become locked in, deployment risk increases with system size, and large codebases impede development velocity. Coordinating changes across large teams generates merge conflicts and communication overhead, while technical debt accumulates as shortcuts create ripple effects through tightly coupled systems.
+
+Containerized microservices promise solutions through service independence enabling autonomous team operation, selective scaling optimizing resource utilization, technology heterogeneity allowing incremental adoption of new tools, and fault isolation preventing cascading failures. Yet these benefits come with substantial complexity: distributed systems introduce network latency and partial failures, operational overhead increases with monitoring requirements across numerous services, deployment complexity grows with version coordination, and organizational transformation requires team restructuring and skill development.
+
+\textbf{Problem Statement:}
+
+\emph{What technical, operational, and business factors obligate organizations to transition from traditional monolithic architectures to virtualized and containerized environments with microservices? Under what circumstances do scalability limitations, deployment constraints, and organizational growth necessitate this architectural shift despite substantial increases in system complexity and operational overhead? How do organizations evaluate trade-offs between monolithic simplicity and microservices flexibility to determine appropriate architecture for specific contexts, and what migration strategies minimize transformation risk while delivering incremental business value?}
+\\
+% ============================================================
+%  CHAPTER 2 --- CONCEPTION
+% ============================================================
+ 
+\chapter{Conception}
+ 
+\section{Introduction}
+ 
+Designing a cluster infrastructure capable of hosting a high-load web
+application while simultaneously guaranteeing service availability and
+controlling operational costs requires decisions that span multiple
+abstraction levels, from the physical placement of servers and network
+equipment down to the scheduling of individual containers.  This chapter
+presents the conception of such an infrastructure across three tightly
+coupled pillars.  The first is the \textit{proof of concept}, which
+establishes the functional objectives and validation conditions for the
+proposed architecture before full-scale deployment is committed.  The
+second is \textit{monitoring and service placement}, which defines the
+layered architecture of the cluster --- physical, virtual,
+containerisation, and monitoring --- together with the scheduling,
+scaling, and placement algorithms that govern runtime resource allocation.
+The third is \textit{artificial intelligence and security}, which
+introduces the intelligent assistance and predictive mechanisms that
+augment operator capabilities and the security posture that protects
+the entire stack.
+ 
+% ===================================================================
+\section{Proof of Concept}
+% ===================================================================
+ 
+\subsection{Context and Objectives}
+ 
+The target workload is a high-load web application whose demand
+characteristics require both elastic scalability and continuous
+availability.  Two operational requirements define the design space.
+The first is \textit{cost efficiency}: physical resources are expensive,
+and their utilisation must be maximised by placing workloads densely and
+scaling them precisely in response to actual demand rather than
+provisioning conservatively for peak load at all times.  The second is
+\textit{high availability}: users must not experience service interruption
+due to hardware failures, software faults, or traffic surges.  These two
+requirements are in structural tension --- dense placement increases the
+blast radius of individual node failures, while conservative redundancy
+wastes resources --- and the architecture must resolve that tension through
+intelligent scheduling rather than by sacrificing one objective for the
+other \cite{buyya2009cloud}.
+ 
+The application is structured as a collection of loosely coupled
+microservices, each responsible for a distinct functional capability and
+deployable independently of the others.  This decomposition is a
+precondition for the scaling and placement strategies developed in the
+following sections: a monolithic application can only be scaled as a
+unit, whereas individual microservices can be replicated or resized
+in response to the specific resource pressures they experience.
+Microservice independence also ensures that a fault in one functional
+component causes graceful degradation rather than total service failure,
+directly supporting the high-availability objective \cite{tanenbaum2017distributed}.
+ 
+\subsection{Validation Scope}
+ 
+The proof of concept is a bounded experimental phase whose purpose is
+to verify that the core architectural mechanisms --- VM provisioning,
+container scheduling, inter-service communication, and scaling
+reactions --- function correctly together before the full cluster is
+assembled.  The PoC is considered successful when four conditions are
+met simultaneously.  First, the provisioning pipeline must onboard a
+new virtual machine into the cluster without manual intervention and
+within a defined time bound.  Second, the scaling mechanisms must react
+to injected load anomalies --- elevated error rates, CPU saturation,
+memory pressure, or I/O exhaustion --- by applying the correct
+remediation within the latency budget of the monitoring cycle.  Third,
+the container scheduling layer must distribute workloads across the
+virtual layer without violating resource constraints and must rebalance
+automatically when a virtual machine is added or removed.  Fourth, the
+application must remain reachable throughout all provisioning and
+scaling operations, confirming that the high-availability objective is
+satisfied under the stress conditions most likely to occur in production.
+ 
+% ===================================================================
+\section{Monitoring and Service Placement}
+% ===================================================================
+ 
+The cluster is structured as four superimposed layers, each providing
+services consumed by the layer above it.  The physical layer provides
+raw compute, storage, and network capacity.  The virtual layer abstracts
+that capacity into manageable virtual machines and organises them into
+logical groupings.  The containerisation layer deploys application
+workloads as containers distributed across the virtual machines.  The
+monitoring layer observes the state of all three operational layers and
+drives the automated responses that maintain the desired operational
+condition of the cluster.
+ 
+% -------------------------------------------------------------------
+\subsection{Physical Layer}
+% -------------------------------------------------------------------
+ 
+The physical layer is the hardware substrate of the cluster.  It consists
+of a set of physical servers that provide the compute and storage
+capacity on which all virtual and containerised workloads ultimately
+execute.  Servers are connected through a switching fabric composed of
+managed network switches that enforce internal traffic segmentation and
+carry inter-VM and inter-container communication with bounded latency.
+At the boundary between the internal cluster network and the external
+internet, a set of hardware firewalls enforces ingress and egress traffic
+policies, filtering malformed or unauthorised requests before they reach
+internal services.  Routers handle inter-segment routing within the
+cluster and manage the uplink to external networks.
+ 
+The physical layer is designed around explicit \textit{failure domains}:
+groups of servers that share a common risk of simultaneous failure, such
+as nodes connected to the same power supply or the same top-of-rack
+switch.  Workload replicas are distributed across distinct failure domains
+so that no single hardware event can eliminate all instances of a
+service.  Network equipment is deployed in redundant pairs so that the
+failure of any single switch, router, or firewall does not partition the
+cluster or interrupt traffic to hosted services.
+ 
+% -------------------------------------------------------------------
+\subsection{Virtual Layer}
+% -------------------------------------------------------------------
+ 
+The virtual layer abstracts the physical server resources into a fleet
+of virtual machines, each representing an isolated execution environment
+with a defined allocation of virtual CPUs, memory, disk, and network
+bandwidth.  Virtual machines are provisioned, sized, and placed on
+physical servers by the mechanisms described in the following
+subsections.
+ 
+\subsubsection{VM Sizing}
+ 
+The initial resource envelope of a newly created virtual machine is
+derived from the workload profile of the service it will host.  A
+workload profile characterises the expected resource demand of a service
+based on performance benchmarks, declared service-level objectives, or
+historical utilisation data from similar services already running in the
+cluster.  The baseline is not fixed: the monitoring layer continuously
+tracks per-VM resource consumption and the VM may be vertically scaled
+at runtime if observed utilisation consistently exceeds defined
+thresholds, as described in the scaling subsection below.  A set of
+standard size classes is defined on top of this baseline, providing
+pre-validated resource ratios for the most common workload types and
+simplifying provisioning decisions for well-characterised services.
+ 
+\subsubsection{Mini-Cluster Partitioning}
+ 
+A key structural contribution of this architecture is the partitioning
+of the VM fleet into $k$ \textit{logical mini-clusters}.  The motivation
+for this decomposition is both algorithmic and operational.  Algorithmically,
+applying the VM provisioning algorithm over the full set of $n$ physical
+machines has a complexity proportional to $n$; by restricting each
+scheduling decision to the $n/k$ physical machines that belong to a
+candidate mini-cluster, the effective scheduling complexity is reduced
+by a factor of $k$, a significant gain at large fleet sizes
+\cite{tanenbaum2017distributed}.  Operationally, mini-clusters group
+virtual machines whose container workloads are strongly related --- that
+is, microservices that communicate frequently or share data --- so that
+the majority of inter-service traffic is confined within a single
+mini-cluster, minimising cross-segment network overhead and simplifying
+traffic policy management.
+ 
+The partitioning further ensures an equitable distribution of containers
+and of the physical resources allocated to them across mini-clusters,
+preventing hotspots from forming in any single segment of the fleet.
+A long-term benefit of this organisation is that virtual machines within
+the same mini-cluster exhibit similar resource consumption patterns,
+making collective resource adjustment decisions more tractable as the
+fleet grows and as application complexity increases over time.
+ 
+The number of mini-clusters $k$ is determined by one of two strategies.
+In the \textbf{static} approach, $k$ is derived from the Key Performance
+Indicators (KPIs) defined by the application designer prior to deployment,
+reflecting a known understanding of the service dependency graph.  In
+the \textbf{dynamic} approach, $k$ is inferred and updated continuously
+by a machine learning model that observes inter-service communication
+patterns and resource consumption correlations, adjusting the
+partitioning as the application evolves \cite{meng2020survey}.  The
+dynamic approach is the long-term target; the static approach provides
+a reliable starting point when historical data is unavailable.
+ 
+\subsubsection{VM Provisioning Algorithm}
+
+The VM provisioning algorithm addresses the following problem: given a
+virtual machine with a defined resource request, select the most
+appropriate physical machine within the relevant mini-cluster on which
+to place it.  The algorithm is a purpose-built hybrid that draws
+conceptual inspiration from two established meta-heuristic optimisation
+strategies --- the \textbf{Whale Optimisation Algorithm} (WOA) and
+\textbf{Differential Evolution} (DE) --- without implementing either one
+in its standard form.  Rather than transplanting both algorithms
+wholesale, the design selects the mechanisms from each that best suit
+the structural constraints of the VM placement problem, combining them
+into a single coherent procedure.
+
+\paragraph{Conceptual origins.}
+The Whale Optimisation Algorithm \cite{mirjalili2016woa} mimics the
+bubble-net hunting behaviour of humpback whales.  A population of
+candidate solutions updates its positions by either contracting toward
+the current best solution (exploitation) or spiralling around it
+(exploration along a logarithmic spiral), with a stochastic switch
+between the two behaviours and a third mode --- random search around an
+arbitrary population member --- that prevents premature convergence.
+Differential Evolution \cite{storn1997de} is a population-based
+optimiser that generates trial solutions through a mutation step (a
+weighted difference of two randomly chosen population members added to a
+third) followed by a crossover step that exchanges components between
+the trial and the original vector, retaining the survivor that achieves
+the better fitness score.  Both algorithms maintain a population of
+candidate solutions and iteratively improve a globally tracked best
+solution, but they achieve diversity through fundamentally different
+mechanisms: WOA through position-update equations parametrised by
+distance to the best, DE through algebraic recombination of distinct
+population members.
+
+\paragraph{Hybrid design rationale.}
+The algorithm partitions the population at each iteration into two
+disjoint subsets.  The first subset, of size $n_\mathrm{WOA}$, is
+updated through WOA-style position equations, benefiting from the
+algorithm's well-characterised balance between spiral exploitation and
+contraction-based convergence.  The second subset, of size
+$n_\mathrm{DE}$, is updated through DE-style mutation and crossover,
+using two population members not belonging to either subset as mutation
+vectors, and then competing the trial solution against its parent
+through selection.  After both subsets have been updated, the globally
+tracked best solution $X^*$ is refreshed to reflect whichever candidate
+in the entire population achieved the lowest fitness.  This split
+prevents the entire population from converging prematurely toward $X^*$
+(a known weakness of pure WOA) while avoiding the directionless random
+walk that can arise in DE when the population diversity collapses.
+
+\paragraph{Formal description.}
+Let $n$ denote the population size and $T$ the number of iterations.
+Each candidate solution $X_i$ represents a complete mapping of virtual
+machines to physical machines within the target mini-cluster, and its
+fitness is evaluated by the function described in the following
+subsection.  The algorithm proceeds as follows.
+
+\medskip
+\noindent\textbf{Initialisation.}
+Draw $n$ candidate mappings $\{X_0, X_1, \ldots, X_{n-1}\}$ uniformly
+at random from the space of feasible placements.  Set $X^*$ to the
+mapping with the lowest fitness among these $n$ candidates.  Set the
+WOA control parameter $a_0 = 2$ and the DE scaling factor $F$ and
+crossover rate $CR$ (with $CR = 0.5$ chosen for symmetry).
+
+\medskip
+\noindent\textbf{Main loop} (for $t = 0, 1, \ldots, T$).
+
+\begin{enumerate}
+
+  \item \textbf{Update control parameters.}
+        \[
+          a = 2\!\left(1 - \frac{t}{T}\right), \quad
+          A = 2a\,r_1 - a, \quad
+          C = 2\,r_2,
+        \]
+        where $r_1, r_2 \sim \mathrm{Uniform}(0,1)$ are drawn
+        independently at each iteration.  A random probability
+        $p \sim \mathrm{Uniform}(0,1)$ is also drawn.
+
+  \item \textbf{WOA update phase.}
+        For each candidate $X_i$ in the WOA subset:
+        \begin{itemize}
+          \item If $p < 0.5$:
+                \begin{itemize}
+                  \item If $|A| < 1$ (exploitation --- shrinking
+                        encircling):
+                        \[
+                          D = |C \cdot X^* - X_i(t)|, \quad
+                          X_i(t{+}1) = X^* - A \cdot D.
+                        \]
+                  \item If $|A| \geq 1$ (exploration --- random agent):
+                        let $X_\mathrm{rand}$ be a randomly chosen
+                        member of the current population; then
+                        \[
+                          D = |C \cdot X_\mathrm{rand} - X_i(t)|, \quad
+                          X_i(t{+}1) = X_\mathrm{rand} - A \cdot D.
+                        \]
+                \end{itemize}
+          \item If $p \geq 0.5$ (spiral update):
+                \[
+                  D = |X^* - X_i(t)|, \quad
+                  X_i(t{+}1) = D\,e^{bl}\cos(2\pi l) + X^*(t),
+                \]
+                where $b$ is the logarithmic spiral constant and
+                $l \sim \mathrm{Uniform}(-1,1)$.
+        \end{itemize}
+        After updating all members of the WOA subset, refresh $X^*$
+        with the best solution found so far.
+
+  \item \textbf{DE mutation, crossover, and selection phase.}
+        For each candidate $X_j$ in the DE subset:
+        \begin{enumerate}
+          \item \textit{Mutation.} Pick two distinct population members
+                $X_{r_1}$ and $X_{r_2}$ that belong to neither the WOA
+                subset nor the DE subset, and form the mutant vector
+                \[
+                  V_j = X^* + F \cdot (X_{r_1} - X_{r_2}).
+                \]
+                Using $X^*$ as the base vector biases the search toward
+                the best-known region of the solution space.
+          \item \textit{Crossover.} For each component $k$ of the
+                mapping:
+                \[
+                  U_j[k] =
+                  \begin{cases}
+                    V_j[k] & \text{if } \mathrm{rand}() \leq CR, \\
+                    X_j[k] & \text{otherwise.}
+                  \end{cases}
+                \]
+          \item \textit{Selection.} Evaluate the trial mapping $U_j$;
+                if $f(U_j) < f(X_j)$, replace $X_j$ with $U_j$.
+        \end{enumerate}
+        After processing all members of the DE subset, refresh $X^*$
+        to the best solution among $X^*$ itself and all updated $X_j$
+        values.
+
+\end{enumerate}
+
+\noindent\textbf{Output.}  After $T+1$ iterations, $X^*$ is the
+recommended placement of all virtual machines onto physical machines
+within the mini-cluster.
+
+\paragraph{Diagram.}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth, height=\textheight, keepaspectratio]{flowchart-improved.png}
+\caption{[Figure: flowchart of the hybrid WOA--DE provisioning algorithm to be inserted here.]}
+\label{fig:flowchart}
+\end{figure}
+
+\paragraph{Properties of the hybrid algorithm.}
+The combination of WOA and DE phases produces a number of desirable
+characteristics for the VM placement setting.
+
+\begin{itemize}
+
+  \item \textbf{Dual exploration mechanism.}  The WOA spiral and
+        random-agent modes explore the placement space from directions
+        anchored to $X^*$ and to random population members
+        respectively, while the DE mutation explores directions defined
+        by the algebraic difference $X_{r_1} - X_{r_2}$.  These two
+        mechanisms are geometrically independent: the first is driven
+        by distance to the best, the second by intra-population
+        diversity.  Running them in parallel within the same iteration
+        substantially reduces the risk that the search stagnates in a
+        local optimum.
+
+  \item \textbf{Preservation of the global best.}  The WOA contraction
+        mode ($|A| < 1$) and the DE base-vector choice ($X^*$) both
+        orient the population toward the current best solution, ensuring
+        that fitness improvements are not discarded between iterations.
+        The refreshment of $X^*$ after each phase further guarantees
+        that the best candidate identified during the WOA phase can
+        immediately influence the DE phase within the same iteration.
+
+  \item \textbf{Greedy selection.}  The DE selection step discards any
+        trial mapping that does not improve upon its parent, so the
+        population fitness is monotonically non-increasing across
+        iterations.  Combined with the WOA encircling contraction, this
+        ensures that the algorithm converges to a locally optimal
+        placement rather than oscillating indefinitely.
+
+  \item \textbf{Parameter sensitivity reduction.}  Pure WOA performance
+        depends heavily on the spiral constant $b$ and the scheduling of
+        $a$, while pure DE is sensitive to the scaling factor $F$ and
+        the crossover rate $CR$.  By mixing both paradigms, the hybrid
+        distributes the optimisation workload across two parameter sets
+        whose failure modes are uncorrelated, reducing the probability
+        that a single poorly chosen parameter degrades the entire search.
+
+  \item \textbf{Suitability for discrete placement spaces.}
+        The position-update equations of both WOA and DE produce
+        real-valued candidate solutions that must be rounded or decoded
+        into feasible discrete mappings before evaluation.  The fitness
+        function (described below) naturally handles this discretisation,
+        so the continuous update rules of both constituent algorithms
+        apply without modification.
+
+\end{itemize}
+
+\noindent The principal limitation of the hybrid is its population-level
+computational cost: each iteration requires $O(n)$ fitness evaluations,
+which becomes significant when the number of physical machines in the
+cluster is large.  A secondary limitation is that the position-update
+equations of both WOA and DE are defined over continuous spaces, so a
+decoding step is required to map real-valued candidate solutions back
+onto the discrete set of feasible VM-to-physical-machine assignments
+before each fitness evaluation.
+ 
+\subsubsection{Fitness Function}
+ 
+The fitness function quantifies how well a candidate physical machine
+satisfies the resource requirements of a virtual machine to be placed
+on it.  Four resource dimensions are considered: CPU capacity ($C$),
+RAM ($R$), input/output throughput including secondary storage and
+network bandwidth ($IO$), and energy consumption ($E$).  Because these
+metrics are measured in heterogeneous units --- CPU in cores, RAM in
+gigabytes, I/O in megabytes per second, and energy in joules per hour
+--- direct comparison would assign disproportionate weight to
+high-magnitude dimensions.  Each metric is therefore standardised prior
+to combination using the formula:
+ 
+$$X_i^* = \frac{X_i - \bar{X}}{\sigma_X}$$
+ 
+where $\bar{X}$ is the mean and $\sigma_X$ is the standard deviation
+of metric $X$ across all candidate physical machines in the sample.
+This normalisation ensures that each dimension contributes equally to
+the composite score regardless of its original unit or magnitude.
+ 
+The composite fitness is then computed as a weighted Euclidean distance:
+ 
+$$\text{fitness} = \sqrt{w_1 \cdot (\Delta C)^2 + w_2 \cdot (\Delta R)^2
+                       + w_3 \cdot (\Delta IO)^2 + w_4 \cdot (\Delta E)^2}$$
+ 
+where $\Delta X$ denotes the difference between the resource quantity
+requested by the virtual machine and the quantity currently available on
+the candidate physical machine.  The squared terms give greater penalisation
+to large resource gaps than to small ones, encoding the operational priority
+of avoiding under-provisioned placements that would cause downtime over
+merely sub-optimal ones that waste some capacity.  The weights $w_i$
+are defined by the application designer to reflect the relative importance
+of each resource dimension for the specific workload, subject to the
+normalisation constraint $\sum_{i=1}^{4} w_i = 1$.  A placement with
+lower fitness score is preferred, as it corresponds to a physical machine
+whose available resources more closely match the demands of the virtual
+machine being placed.
+ 
+\subsubsection{VM Scaling}
+ 
+The monitoring layer continuously evaluates per-VM resource utilisation
+and application-level error rates.  When observed metrics cross
+defined thresholds, the alert manager triggers the appropriate scaling
+action.  Two classes of scaling response are defined.
+ 
+\textbf{Horizontal scaling} responds to conditions that indicate that
+the service is receiving more requests than a single VM instance can
+handle.  It is triggered when the HTTP 5xx error rate exceeds 1\%
+(warning) or 5\% (critical), or when the network packet loss rate
+exceeds 2\% (critical).  The remediation creates a new virtual machine
+with the same resource configuration as the saturated instance; the new
+VM is placed within the same mini-cluster as its parent by invoking the
+provisioning algorithm, and it immediately joins the load-balancing pool
+for the corresponding service.  Horizontal scaling preserves service
+availability by distributing demand across a larger number of equivalent
+instances rather than by interrupting the existing one.
+ 
+\textbf{Vertical scaling} responds to resource saturation on an
+individual VM.  CPU utilisation above 80\% (warning) or 95\% (critical)
+triggers the addition of one virtual CPU to the instance.  RAM utilisation
+above 60\% (warning) or 80\% (critical) triggers an increase of 20\% of
+the previously allocated memory.  Free disk I/O capacity below 20\%
+(both warning and critical thresholds) triggers the addition of 15~GB
+of storage.  Vertical scaling modifies the resource envelope of the
+existing virtual machine without duplicating it, making it appropriate
+for bottlenecks that are intrinsic to the workload rather than caused
+by request volume.
+ 
+In all scaling scenarios, if the physical machine hosting the virtual
+machine does not possess sufficient free capacity to accommodate the
+additional resources requested by vertical scaling, the virtual machine
+is live-migrated to a more suitable physical machine.  This migration
+is performed by invoking the provisioning algorithm on the migrating VM,
+which selects the best available physical machine within the
+mini-cluster according to the fitness function described above.
+ 
+% -------------------------------------------------------------------
+\subsection{Containerisation Layer}
+% -------------------------------------------------------------------
+ 
+The containerisation layer deploys application services as containers
+distributed across the virtual machine fleet.  Each container runs a
+single microservice and is isolated from co-located containers by the
+standard kernel mechanisms of the host operating system.  Containers are
+mapped to virtual machines using a \textbf{Best Fit} strategy: for each
+container to be scheduled, the virtual machine that has the least
+remaining capacity while still being able to satisfy the container's
+resource request is selected.  This strategy minimises resource
+fragmentation across the VM fleet by filling existing virtual machines
+as fully as possible before utilising the spare capacity of less-loaded
+ones, thereby reducing the number of virtual machines that must remain
+active to host a given set of containers and lowering the total energy
+and licensing cost of the cluster \cite{buyya2009cloud}.
+ 
+Containers belonging to microservices within the same mini-cluster are
+preferentially scheduled on virtual machines within that mini-cluster,
+preserving the network locality properties that the partitioning strategy
+was designed to create.  When a horizontal scaling event creates a new
+virtual machine, its containers are placed according to the same Best
+Fit rule, and the new VM is registered within the same mini-cluster as
+its parent so that the cluster topology remains consistent.
+ 
+% -------------------------------------------------------------------
+\subsection{Monitoring Layer}
+% -------------------------------------------------------------------
+ 
+The monitoring layer observes the operational state of all three layers
+beneath it and produces the information and automated responses required
+to maintain the cluster in its desired condition.  It is composed of two
+functional modules: the monitoring subsystem and the alert manager.
+ 
+\subsubsection{Monitoring Subsystem}
+ 
+The monitoring subsystem collects telemetry data continuously from every
+observable entity in the cluster.  Its collection scope spans all four
+categories of observable infrastructure: physical servers, including
+CPU utilisation, memory consumption, disk I/O throughput, and energy
+draw per node; virtual machines, including per-VM CPU steal time,
+working-set size, and container runtime metrics; physical network devices,
+including switch port utilisation, packet loss counters, and routing
+table state; and virtual network devices, including software-defined
+switch throughput and inter-VM traffic volumes.  This unified collection
+scope ensures that no layer of the infrastructure produces blind spots
+in the operator's view of cluster state.
+ 
+Data is collected through a pull-based model in which a central
+aggregator queries agents deployed on each node at configurable
+intervals, following the principle established by Andreolini et al.\
+\cite{andreolini2014closer} that pull-based architectures scale more
+predictably than push-based ones at large fleet sizes.  Collected streams
+are stored with time-windowed retention policies that preserve
+high-resolution data for anomalous intervals and apply progressive
+downsampling to normal intervals, consistent with the selective
+compression approach of Hoke et al.\ \cite{hoke2006intemon}.
+Co-located streams --- for example, the CPU and memory utilisation of
+all virtual machines sharing the same physical host --- are stored with
+their correlational relationships preserved, enabling anomaly detection
+based on breaks in the correlation structure rather than on isolated
+threshold crossings alone.
+ 
+\subsubsection{Alert Manager}
+ 
+The alert manager is the decision module of the monitoring layer.  It
+receives signals from the monitoring subsystem and is responsible for
+mapping observed conditions to specific remediation actions.  When a
+monitored metric crosses a defined threshold or an anomaly model
+identifies a statistically abnormal pattern, the monitoring subsystem
+forwards a structured event to the alert manager, describing the affected
+resource, the observed value, and the severity classification.
+ 
+The alert manager evaluates each incoming event against its rule base
+and selects the appropriate response.  For scaling events --- whether
+horizontal scaling triggered by elevated error rates and packet loss, or
+vertical scaling triggered by CPU, RAM, or I/O saturation --- it issues
+the corresponding provisioning or resource-adjustment request to the
+virtual layer, as described in the scaling subsection above.  For
+informational conditions that do not require automated remediation, it
+routes a notification to the operator interface, providing the
+contextual data needed for human review.  To prevent alert storms during
+cascading failures, the alert manager applies grouping and inhibition
+rules that consolidate related events into a single actionable signal,
+suppressing downstream symptom alerts when a root-cause alert for the
+same component is already active \cite{beyer2016sre}.
+ 
+% ===================================================================
+\section{Artificial Intelligence and Security}
+% ===================================================================
+ 
+\subsection{AI-Powered Administrative Assistant}
+ 
+The volume of monitoring data and the speed of automated remediation
+events in a large cluster exceed the capacity of a human operator to
+track through dashboards alone.  An AI-powered conversational assistant
+bridges this gap by providing a natural-language interface through which
+the administrator can query the current state of the cluster, investigate
+recent incidents, and request remediation actions without navigating
+low-level management interfaces.
+ 
+The assistant has read access to the full telemetry history collected
+by the monitoring subsystem and can answer queries such as the current
+resource utilisation of a specific mini-cluster, the timeline of a
+recent scaling event, or the list of virtual machines that have exceeded
+their CPU thresholds in a given time window.  It can translate
+natural-language questions into structured queries against the monitoring
+data store and present results in a summarised, human-readable form.
+ 
+When the administrator requests an action --- such as the live migration
+of a virtual machine, the manual triggering of a horizontal scaling
+event, or the modification of an alert threshold --- the assistant
+presents a clear description of the intended operation and its expected
+consequences and waits for explicit confirmation before issuing the
+corresponding command to the cluster control plane.  No action that
+modifies cluster state is executed autonomously.  This design preserves
+human oversight for all consequential decisions while eliminating the
+need for the administrator to interact with multiple low-level APIs
+directly \cite{meng2020survey}.
+ 
+\subsection{VM Sizing and Provisioning Prediction}
+ 
+In addition to the reactive scaling mechanisms described in the monitoring
+and service placement section, the architecture incorporates a predictive
+component that anticipates resource needs before saturation is reached.
+This component operates in two modes.
+ 
+At \textit{creation time}, the predictive model receives a description
+of the service to be hosted --- its type, expected request volume, and
+historical resource profiles from similar services in the cluster --- and
+produces a recommended initial resource envelope.  This recommendation
+supplements the baseline sizing defined in the VM sizing subsection,
+adapting the initial allocation to the specific workload rather than
+defaulting unconditionally to the standard baseline configuration.
+Accurate initial sizing reduces the frequency of reactive vertical
+scaling events in the early operational lifetime of a virtual machine,
+improving both resource efficiency and service stability \cite{buyya2009cloud}.
+ 
+At \textit{runtime}, the predictive model continuously analyses the
+resource consumption trends of active virtual machines.  By applying
+time-series forecasting over the collected metrics, it identifies VMs
+whose utilisation trajectories are approaching the scaling thresholds
+before those thresholds are crossed, and recommends pre-emptive resource
+adjustments.  These recommendations are surfaced through the
+administrative assistant interface, where the administrator reviews and
+confirms them before any resource change is applied.  This closed-loop
+design combines the pattern-recognition capability of a learning model
+with the judgement and accountability of human oversight, avoiding
+both the instability of unconstrained autonomous scaling and the
+latency of purely reactive threshold-based scaling \cite{meng2020survey}.
+ 
+\subsection{Security}
+ 
+Security in this cluster is treated as a cross-cutting concern that
+applies uniformly across all four layers of the architecture, governed
+by the principle of \textit{defence in depth}: each layer enforces its
+own independent protection mechanisms so that the compromise of any
+single layer does not grant uncontrolled access to the layers beneath it.
+ 
+At the physical boundary, hardware firewalls and managed switches
+enforce strict ingress and egress traffic filtering, ensuring that only
+traffic conforming to declared communication policies reaches the
+internal cluster network.  Within the cluster, all inter-VM and
+inter-container communication is subject to network segmentation policies
+that default to deny: a service may only communicate with the specific
+peers for which an explicit authorisation has been declared.  This
+microsegmentation confines the lateral movement available to an attacker
+who has compromised a single container or virtual machine, limiting the
+blast radius of a breach to the reachable neighbourhood of the
+compromised workload \cite{rose2020zero}.
+ 
+All entities in the cluster --- physical nodes, virtual machines,
+containers, and user accounts --- are assigned unique, cryptographically
+verifiable identities.  No entity is trusted by virtue of its network
+location alone.  Inter-component communication is mutually authenticated,
+and authorisation decisions follow the principle of least privilege:
+each entity holds only the permissions necessary for its defined function.
+Credentials are short-lived and rotated automatically, limiting the
+exposure window in the event of a credential leak.
+ 
+The monitoring subsystem contributes to security by providing the
+observational foundation for behavioural anomaly detection.  Traffic
+patterns, API call frequencies, and resource consumption profiles that
+deviate from established baselines are flagged as potential security
+events and routed to the alert manager, which escalates them to the
+administrator through the same notification pathway used for operational
+incidents.  All security-relevant events --- authentication attempts,
+privilege escalations, policy modifications, and administrative commands
+--- are recorded in an immutable audit log that provides the evidentiary
+trail required for post-incident forensics and compliance verification
+\cite{beyer2016sre, rose2020zero}.
+ 
+% ===================================================================
+\section{Synthesis}
+% ===================================================================
+ 
+The three pillars of this conception are mutually dependent rather than
+independent.  The proof of concept validates the provisioning, scaling,
+and communication mechanisms that the monitoring and service placement
+layer depends upon for correct operation.  The monitoring layer, in turn,
+provides the real-time utilisation data that the fitness function requires
+for accurate placement decisions, the anomaly signals that drive the
+alert manager, and the historical telemetry on which the predictive AI
+models are trained.  The security layer protects the integrity of the
+monitoring data itself: an adversary capable of manipulating the metrics
+seen by the alert manager or the predictive model could disable both
+automated remediation and intelligent assistance, making security not a
+peripheral concern but a structural requirement of the entire design.
+Together, the four architectural layers --- physical, virtual,
+containerisation, and monitoring --- and the three operational pillars
+form a coherent, self-regulating infrastructure capable of sustaining a
+high-load web application at scale while respecting the twin constraints
+of cost efficiency and high availability.
+ 
+% ============================================================
+% BIBTEX ENTRIES (add to your .bib file):
+%
+% @book{tanenbaum2017distributed,
+%   author    = {Tanenbaum, Andrew S. and Van Steen, Maarten},
+%   title     = {Distributed Systems: Principles and Paradigms},
+%   edition   = {3},
+%   publisher = {Pearson}, year = {2017}
+% }
+% @article{buyya2009cloud,
+%   author  = {Buyya, Rajkumar and Yeo, Chee Shin and Venugopal, Srikumar
+%              and Broberg, James and Brandic, Ivona},
+%   title   = {Cloud Computing and Emerging {IT} Platforms},
+%   journal = {Future Generation Computer Systems},
+%   volume  = {25}, number = {6}, pages = {599--616}, year = {2009}
+% }
+% @inproceedings{meng2020survey,
+%   author    = {Meng, Yuan and Zhang, Shenglin and Sun, Yongqian and others},
+%   title     = {Localizing Failure Root Causes in a Microservice through
+%                Causality Inference},
+%   booktitle = {Proc.\ 28th IEEE Intl.\ Conf.\ on Network Protocols (ICNP)},
+%   year      = {2020}, publisher = {IEEE}
+% }
+% @techreport{rose2020zero,
+%   author      = {Rose, Scott and Borchert, Oliver and Mitchell, Stu and Connelly, Sean},
+%   title       = {Zero Trust Architecture},
+%   institution = {NIST}, number = {SP 800-207}, year = {2020}
+% }
+% @article{mirjalili2016woa,
+%   author  = {Mirjalili, Seyedali and Lewis, Andrew},
+%   title   = {The Whale Optimisation Algorithm},
+%   journal = {Advances in Engineering Software},
+%   volume  = {95}, pages = {51--67}, year = {2016}
+% }
+% @article{storn1997de,
+%   author  = {Storn, Rainer and Price, Kenneth},
+%   title   = {Differential Evolution --- A Simple and Efficient Heuristic
+%              for Global Optimization over Continuous Spaces},
+%   journal = {Journal of Global Optimization},
+%   volume  = {11}, number = {4}, pages = {341--359}, year = {1997}
+% }
+% -- reuse from Chapter 1: hoke2006intemon, andreolini2014closer, beyer2016sre
+% ============================================================
+
+\end{document}
