@@ -1,0 +1,215 @@
+groups:
+  - name: http_errors
+    rules:
+      - alert: HTTP5xxWarning
+        expr: >
+          sum by(instance, job) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by(instance, job) (rate(http_requests_total[5m]))
+          * 100 > 1
+        for: 2m
+        labels:
+          severity: warning
+          action: horizontal_scaling
+        annotations:
+          summary: "HTTP 5xx rate > 1% on {{ $labels.instance }}"
+          description: "5xx error rate = {{ $value | printf \"%.2f\" }}% — Monitor. Action: Horizontal Scaling"
+
+      - alert: HTTP5xxCritical
+        expr: >
+          sum by(instance, job) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by(instance, job) (rate(http_requests_total[5m]))
+          * 100 > 5
+        for: 1m
+        labels:
+          severity: critical
+          action: horizontal_scaling
+        annotations:
+          summary: "HTTP 5xx rate > 5% on {{ $labels.instance }}"
+          description: "5xx error rate = {{ $value | printf \"%.2f\" }}% — Horizontal Scaling required"
+
+  - name: network
+    rules:
+      - alert: PacketLossCritical
+        expr: >
+          rate(node_network_receive_drop_total{device!="lo"}[5m])
+          /
+          (rate(node_network_receive_packets_total{device!="lo"}[5m]) + 1)
+          * 100 > 2
+        for: 1m
+        labels:
+          severity: critical
+          action: horizontal_scaling
+        annotations:
+          summary: "Packet loss > 2% on {{ $labels.instance }}"
+          description: "Packet loss = {{ $value | printf \"%.2f\" }}% on {{ $labels.device }} — Horizontal Scaling required"
+
+  - name: cpu
+    rules:
+      - alert: CPUWarning
+        expr: >
+          100 - (avg by(instance, job)
+            (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+          action: vertical_scaling_cpu
+        annotations:
+          summary: "CPU > 80% on {{ $labels.instance }}"
+          description: "CPU = {{ $value | printf \"%.2f\" }}% — Monitor. If PM insufficient, migrate VM."
+
+      - alert: CPUCritical
+        expr: >
+          100 - (avg by(instance, job)
+            (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 1m
+        labels:
+          severity: critical
+          action: vertical_scaling_cpu
+        annotations:
+          summary: "CPU > 95% on {{ $labels.instance }}"
+          description: "CPU = {{ $value | printf \"%.2f\" }}% — Add 1 vCPU. If PM insufficient, migrate VM."
+
+  - name: memory
+    rules:
+      - alert: RAMWarning
+        expr: >
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+          * 100 > 60
+        for: 2m
+        labels:
+          severity: warning
+          action: vertical_scaling_ram
+        annotations:
+          summary: "RAM > 60% on {{ $labels.instance }}"
+          description: "RAM used = {{ $value | printf \"%.2f\" }}% — Monitor. If PM insufficient, migrate VM."
+
+      - alert: RAMCritical
+        expr: >
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+          * 100 > 80
+        for: 2m
+        labels:
+          severity: critical
+          action: vertical_scaling_ram
+        annotations:
+          summary: "RAM > 80% on {{ $labels.instance }}"
+          description: "RAM used = {{ $value | printf \"%.2f\" }}% — Add 20% RAM. If PM insufficient, migrate VM."
+
+  - name: disk
+    rules:
+      - alert: DiskIOWarning
+        expr: >
+          (1 - rate(node_disk_io_time_seconds_total{device!~"sr.*|loop.*"}[5m]))
+          * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          action: vertical_scaling_disk
+        annotations:
+          summary: "Disk I/O free < 20% on {{ $labels.instance }}"
+          description: "Free I/O on {{ $labels.device }} = {{ $value | printf \"%.2f\" }}% — Monitor."
+
+      - alert: DiskIOCritical
+        expr: >
+          (1 - rate(node_disk_io_time_seconds_total{device!~"sr.*|loop.*"}[5m]))
+          * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          action: vertical_scaling_disk
+        annotations:
+          summary: "Disk I/O free < 10% on {{ $labels.instance }}"
+          description: "Free I/O on {{ $labels.device }} = {{ $value | printf \"%.2f\" }}% — Add 15G disk. If PM insufficient, migrate VM."
+
+  - name: vm_availability_detailed
+    rules:
+      - alert: VMUnreachable
+        expr: up{job="node_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          action: check_network_then_migrate
+          cause: network_or_host_failure
+        annotations:
+          summary: "VM {{ $labels.instance }} inaccessible"
+          description: "Aucune réponse de node_exporter depuis 2min — Vérifier: 1) Ping VM, 2) SSH, 3) Proxmox host status"
+
+      - alert: ScaphandreDown
+        expr: up{job="scaphandre"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          action: restart_scaphandre
+          cause: scaphandre_failure
+        annotations:
+          summary: "Scaphandre down sur {{ $labels.instance }}"
+          description: "Scaphandre ne répond pas — Métriques énergie indisponibles. Redémarrer le service Scaphandre."
+
+      - alert: VMHighLatency
+        expr: >
+          prometheus_target_scrape_duration_seconds{job=~"node_exporter|scaphandre"} > 2
+        for: 3m
+        labels:
+          severity: warning
+          action: investigate_network
+          cause: network_degradation
+        annotations:
+          summary: "Latence élevée sur {{ $labels.instance }}"
+          description: "Scrape duration > 2s — Réseau surchargé ou VM overloaded. Vérifier top et iftop."
+
+      - alert: VMRebootDetected
+        expr: >
+          (node_time_seconds - node_boot_time_seconds < 300)
+          and
+          (changes(node_boot_time_seconds[10m]) > 0)
+        for: 1m
+        labels:
+          severity: info
+          action: monitor_stability
+          cause: reboot
+        annotations:
+          summary: "VM {{ $labels.instance }} a rebooté récemment"
+          description: "Uptime < 5min et changement boot_time détecté — VM a redémarré. Vérifier logs: journalctl -b -1"
+
+      - alert: VMOOMKilled
+        expr: increase(node_vmstat_oom_kill[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          action: add_ram_or_kill_processes
+          cause: out_of_memory
+        annotations:
+          summary: "OOM Killer actif sur {{ $labels.instance }}"
+          description: "Processus tués par manque de mémoire — Augmenter RAM ou tuer processus gourmands."
+
+      - alert: VMDiskAlmostFull
+        expr: >
+          node_filesystem_avail_bytes{mountpoint="/"}
+          /
+          node_filesystem_size_bytes{mountpoint="/"}
+          < 0.02
+        for: 1m
+        labels:
+          severity: critical
+          action: emergency_disk_cleanup
+          cause: disk_full_service_crash
+        annotations:
+          summary: "VM {{ $labels.instance }} — Disk presque plein!"
+          description: "Espace disque < 2% sur / — Risque de blocage des services. Nettoyer immédiatement."
+
+  - name: energy
+    rules:
+      - alert: VMHighPowerConsumption
+        expr: >
+          sum by(instance, vm_id, vm_name) (
+            scaph_vm_power_microwatts{job="scaphandre"}
+          ) / 1000000 > 50
+        for: 5m
+        labels:
+          severity: warning
+          action: investigate_power
+        annotations:
+          summary: "Consommation élevée sur VM {{ $labels.vm_name }}"
+          description: "Puissance = {{ $value | printf \"%.2f\" }}W — VM {{ $labels.vm_name }} (id={{ $labels.vm_id }}) consomme trop."

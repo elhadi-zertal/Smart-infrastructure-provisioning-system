@@ -1,0 +1,71 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /home/oussama/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node_exporter'
+    http_sd_configs:
+      - url: http://localhost:5000/targets/node_exporter
+        refresh_interval: 5s
+
+  - job_name: 'scaphandre'
+    http_sd_configs:
+      - url: http://localhost:5000/targets/scaphandre
+        refresh_interval: 5s
+    metric_relabel_configs:
+      - source_labels: [cmdline]
+        regex: '.*-id([0-9]+)-name([^,-]+).*'
+        target_label: vm_id
+        replacement: '${1}'
+      - source_labels: [cmdline]
+        regex: '.*-id([0-9]+)-name([^,-]+).*'
+        target_label: vm_name
+        replacement: '${2}'
+
+ - job_name: 'snmp'
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    http_sd_configs:
+      - url: http://localhost:5000/targets/snmp_exporter
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:9116
+
+
+
+ 
+- job_name: 'blackbox-exporter'
+    metrics_path: /probe
+    params:
+      module: [http_any] 
+    http_sd_configs:
+      - url: http://localhost:5000/targets/blackbox_exporter
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:9115
+
+
+
+
+
+remote_write:
+  - url: "http://localhost:8086/api/v1/prom/write?org=monitoring&bucket=prometheus"
+    bearer_token_file: /etc/prometheus/influxdb_token

@@ -1,0 +1,34 @@
+[
+  {
+    "ip": "172.25.5.81",
+    "port": 9100,
+    "env": "prod",
+    "job": "node_exporter",
+    "type": "vm",
+    "hostname": "vm-01"
+  },
+  {
+    "ip": "172.25.5.10",
+    "port": 8080,
+    "env": "prod",
+    "job": "scaphandre",
+    "type": "pm",
+    "hostname": "proxmox-01"
+  },
+  {
+    "ip": "172.25.5.50",
+    "port": 9116,
+    "env": "prod",
+    "job": "snmp_exporter",
+    "type": "network",
+    "hostname": "switch-01"
+  },
+  {
+    "ip": "http://172.25.5.81",
+    "port": 9115,
+    "env": "prod",
+    "job": "blackbox_exporter",
+    "type": "probe",
+    "hostname": "probe-vm-01"
+  }
+]
