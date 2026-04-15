@@ -1,0 +1,5 @@
+Since the data is too large and we couldn't put it in the git repository, please download the data from this link :
+
+https://drive.google.com/drive/folders/1723ydKWeuqktXpRHLIlMsZWHphtji_WR?usp=drive_link
+
+Also please put the two .csv files you downloaded in a folder data/, inside the same folder as the .ipynb file
