@@ -200,13 +200,16 @@ _ml_snapshot_buffer: deque[dict] = deque(maxlen=500)   # ~500 = 5 min × 10 VMs
 
 # Last ML-predicted config (updated after every successful /sync)
 _ml_config: dict = {
-    "w_cpu"       : W_CPU,
-    "w_ram"       : W_RAM,
-    "w_io"        : W_IO,
-    "w_energy"    : W_E,
-    "thresh_cpu"  : 80.0,
-    "thresh_ram"  : 85.0,
-    "thresh_http" : 2.0,
+    "w_cpu"            : W_CPU,
+    "w_ram"            : W_RAM,
+    "w_io"             : W_IO,
+    "w_energy"         : W_E,
+    "thresh_cpu_warn"  : 64.0,
+    "thresh_cpu_crit"  : 80.0,
+    "thresh_ram_warn"  : 72.0,
+    "thresh_ram_crit"  : 85.0,
+    "thresh_http_warn" : 1.1,
+    "thresh_http_crit" : 2.0,
 }
 
 # ─────────────────────────────────────────────
@@ -531,13 +534,16 @@ def _collect_ml_snapshot(vm: dict, instance_id: str) -> None:
     it to _ml_snapshot_buffer. Called from inside poll_cluster() for
     every live VM.
     """
+    # Proxmox reports cpu as a ratio 0-1, mem/maxmem in bytes
     cpu_pct = float(vm.get("cpu",    0.0)) * 100.0
     max_mem = float(vm.get("maxmem", 1))
     ram_pct = (1.0 - float(vm.get("mem", 0)) / max(max_mem, 1)) * 100.0
 
+    # Disk IO: Proxmox gives diskread/diskwrite in bytes/s — normalise to %
     disk_bps = float(vm.get("diskread", 0)) + float(vm.get("diskwrite", 0))
     io_pct   = min(disk_bps / NODE_IO_CAPACITY_BPS * 100.0, 100.0)
 
+    # Power: from Prometheus scaph query if available, else estimate from CPU
     power_microwatts = vm.get("energy_actual", 0)
     if not power_microwatts:
         power_watts = 40.0 + (80.0 * (cpu_pct / 100.0))
@@ -547,6 +553,7 @@ def _collect_ml_snapshot(vm: dict, instance_id: str) -> None:
     http_5xx_rate = float(vm.get("http_5xx_rate", 0.0))
     net_drop_rate = float(vm.get("net_drop_rate", 0.0))
 
+    # Derive VLAN from the instance IP prefix
     ip = str(instance_id).split(":")[0]
     if ip.startswith("10.10.10."): vlan = "vlan-1-app"
     elif ip.startswith("10.20.20."): vlan = "vlan-2-app"
@@ -568,7 +575,11 @@ def _collect_ml_snapshot(vm: dict, instance_id: str) -> None:
     })
 
 
-def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float) -> None:
+def _rewrite_alerts_yml(
+    thresh_cpu_warn: float, thresh_cpu_crit: float,
+    thresh_ram_warn: float, thresh_ram_crit: float,
+    thresh_http_warn: float, thresh_http_crit: float
+) -> None:
     """
     Overwrite ALERTS_YML_PATH with Prometheus alert rules that use the
     ML-predicted thresholds, then signal Prometheus to reload its config.
@@ -583,7 +594,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                         "expr": (
                             f"100 - (avg by(instance) "
                             f"(rate(node_cpu_seconds_total{{mode='idle'}}[2m])) * 100) "
-                            f"> {thresh_cpu * 0.85:.1f}"
+                            f"> {thresh_cpu_warn:.1f}"
                         ),
                         "for": "2m",
                         "labels"     : {"severity": "warning", "type": "cpu"},
@@ -591,7 +602,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                             "summary"    : "CPU usage above warning threshold",
                             "description": (
                                 f"Instance {{{{ $labels.instance }}}} CPU > "
-                                f"{thresh_cpu * 0.85:.1f}% (ML threshold)."
+                                f"{thresh_cpu_warn:.1f}% (ML threshold)."
                             ),
                         },
                     },
@@ -600,7 +611,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                         "expr": (
                             f"100 - (avg by(instance) "
                             f"(rate(node_cpu_seconds_total{{mode='idle'}}[2m])) * 100) "
-                            f"> {thresh_cpu:.1f}"
+                            f"> {thresh_cpu_crit:.1f}"
                         ),
                         "for": "1m",
                         "labels"     : {"severity": "critical", "type": "cpu"},
@@ -608,7 +619,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                             "summary"    : "CPU usage above critical threshold",
                             "description": (
                                 f"Instance {{{{ $labels.instance }}}} CPU > "
-                                f"{thresh_cpu:.1f}% (ML threshold)."
+                                f"{thresh_cpu_crit:.1f}% (ML threshold)."
                             ),
                         },
                     },
@@ -616,7 +627,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                         "alert": "HighMemory_Warning",
                         "expr": (
                             f"(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) "
-                            f"* 100 > {thresh_ram * 0.90:.1f}"
+                            f"* 100 > {thresh_ram_warn:.1f}"
                         ),
                         "for": "2m",
                         "labels"     : {"severity": "warning", "type": "memory"},
@@ -624,7 +635,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                             "summary": "Memory usage above warning threshold",
                             "description": (
                                 f"Instance {{{{ $labels.instance }}}} RAM > "
-                                f"{thresh_ram * 0.90:.1f}% (ML threshold)."
+                                f"{thresh_ram_warn:.1f}% (ML threshold)."
                             ),
                         },
                     },
@@ -632,7 +643,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                         "alert": "HighMemory_Critical",
                         "expr": (
                             f"(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) "
-                            f"* 100 > {thresh_ram:.1f}"
+                            f"* 100 > {thresh_ram_crit:.1f}"
                         ),
                         "for": "1m",
                         "labels"     : {"severity": "critical", "type": "memory"},
@@ -640,7 +651,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                             "summary": "Memory usage above critical threshold",
                             "description": (
                                 f"Instance {{{{ $labels.instance }}}} RAM > "
-                                f"{thresh_ram:.1f}% (ML threshold)."
+                                f"{thresh_ram_crit:.1f}% (ML threshold)."
                             ),
                         },
                     },
@@ -648,7 +659,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                         "alert": "High5xxRate_Warning",
                         "expr": (
                             f"rate(http_requests_total{{status=~'5..'}}[5m]) / "
-                            f"rate(http_requests_total[5m]) > {thresh_http * 0.5:.4f}"
+                            f"rate(http_requests_total[5m]) > {thresh_http_warn / 100.0:.4f}"
                         ),
                         "for": "2m",
                         "labels"     : {"severity": "warning", "type": "http_5xx"},
@@ -660,7 +671,7 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
                         "alert": "High5xxRate_Critical",
                         "expr": (
                             f"rate(http_requests_total{{status=~'5..'}}[5m]) / "
-                            f"rate(http_requests_total[5m]) > {thresh_http / 100:.4f}"
+                            f"rate(http_requests_total[5m]) > {thresh_http_crit / 100.0:.4f}"
                         ),
                         "for": "1m",
                         "labels"     : {"severity": "critical", "type": "http_5xx"},
@@ -688,8 +699,8 @@ def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float
         yaml.dump(rules, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
     logger.info(
-        f"alerts.yml rewritten → thresh_cpu={thresh_cpu}, "
-        f"thresh_ram={thresh_ram}, thresh_http={thresh_http}"
+        f"alerts.yml rewritten → thresh_cpu_crit={thresh_cpu_crit}, "
+        f"thresh_ram_crit={thresh_ram_crit}, thresh_http_crit={thresh_http_crit}"
     )
 
     try:
@@ -721,6 +732,7 @@ async def ml_sync_job() -> None:
     if not ML_ENABLED:
         return
 
+    # 1. Drain buffer
     snapshots = list(_ml_snapshot_buffer)
     _ml_snapshot_buffer.clear()
 
@@ -730,6 +742,7 @@ async def ml_sync_job() -> None:
 
     logger.info(f"ml_sync_job: sending {len(snapshots)} snapshots to ML service...")
 
+    # 2. POST to ML service
     payload = {
         "snapshots": snapshots,
         "sent_at"  : __import__("datetime").datetime.utcnow().isoformat() + "Z",
@@ -751,6 +764,7 @@ async def ml_sync_job() -> None:
         logger.error(f"ml_sync_job: unexpected error — {exc}")
         return
 
+    # 3. Apply new config
     cfg = data.get("config", {})
 
     new_w_cpu = float(cfg.get("w_cpu",    W_CPU))
@@ -773,19 +787,29 @@ async def ml_sync_job() -> None:
 
     _ml_config = cfg
 
+    # Extract thresholds safely (falling back to single keys if ML hasn't split them yet)
+    t_cpu_c  = float(cfg.get("thresh_cpu_crit",  cfg.get("thresh_cpu",  80.0)))
+    t_cpu_w  = float(cfg.get("thresh_cpu_warn",  t_cpu_c * 0.8))
+
+    t_ram_c  = float(cfg.get("thresh_ram_crit",  cfg.get("thresh_ram",  85.0)))
+    t_ram_w  = float(cfg.get("thresh_ram_warn",  t_ram_c * 0.85))
+
+    t_http_c = float(cfg.get("thresh_http_crit", cfg.get("thresh_http", 2.0)))
+    t_http_w = float(cfg.get("thresh_http_warn", t_http_c * 0.5))
+
     await asyncio.to_thread(
         _rewrite_alerts_yml,
-        float(cfg.get("thresh_cpu",  80.0)),
-        float(cfg.get("thresh_ram",  85.0)),
-        float(cfg.get("thresh_http",  2.0)),
+        t_cpu_w, t_cpu_c,
+        t_ram_w, t_ram_c,
+        t_http_w, t_http_c
     )
 
     logger.info(
         f"ml_sync_job: applied new config — "
         f"w=({W_CPU:.3f}, {W_RAM:.3f}, {W_IO:.3f}, {W_E:.3f}) | "
-        f"thresh_cpu={cfg.get('thresh_cpu')} "
-        f"thresh_ram={cfg.get('thresh_ram')} "
-        f"thresh_http={cfg.get('thresh_http')}"
+        f"thresh_cpu_crit={t_cpu_c:.1f} "
+        f"thresh_ram_crit={t_ram_c:.1f} "
+        f"thresh_http_crit={t_http_c:.1f}"
     )
 
 
