@@ -86,6 +86,7 @@ import random
 import urllib.parse
 import urllib.request
 from collections import deque
+from datetime import datetime, timezone
 
 # ─────────────────────────────────────────────
 #  Logging
@@ -327,6 +328,15 @@ class VMResources(BaseModel):
     disk:    Optional[str] = None
     disk_id: Optional[str] = "scsi0"
 
+class WeightsUpdate(BaseModel):
+    w_cpu: float
+    w_ram: float
+    w_io: float
+    w_e: float
+    source: str = "xgboost"
+    bottleneck: str = "unknown"
+    confidence: float = 0.0
+
 
 # ─────────────────────────────────────────────
 #  In-memory cluster state
@@ -340,6 +350,13 @@ cluster_state: dict = {
 
 _state_lock  = asyncio.Lock()
 warning_queue: list[dict] = []
+
+_current_weights_meta = {
+    "source": "static_env",
+    "bottleneck": "None",
+    "confidence": 1.0,
+    "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+}
 
 
 # ─────────────────────────────────────────────
@@ -1705,3 +1722,64 @@ def scale_deployment_replicas(namespace: str, deployment: str, replicas: int):
         return {"status": "ok", "deployment": f"{namespace}/{deployment}", "replicas": replicas}
     except ApiException as e:
         raise HTTPException(500, str(e))
+
+
+# ─────────────────────────────────────────────
+#  AI Layer & Data Engineering Endpoints (Phase 3)
+# ─────────────────────────────────────────────
+
+@app.get("/cluster-snapshot")
+def get_cluster_snapshot():
+    """
+    Called by the XGBoost service every 10s to build the Feature Vector (X).
+    Combines the current cluster state with the rolling delta-history stats.
+    """
+    stats = delta_history_stats()
+    return {
+        "nodes": cluster_state["nodes"],
+        "vms": cluster_state["vms"],
+        "lxc": cluster_state["lxc"],
+        "deployments": cluster_state["deployments"],
+        "delta_history_stats": stats
+    }
+
+
+@app.post("/weights")
+def update_weights(payload: WeightsUpdate):
+    """
+    Receives dynamic fitness function weights from the XGBoost ML Service.
+    """
+    global W_CPU, W_RAM, W_IO, W_E, _current_weights_meta
+    
+    # Validate sum is 1.0 (with small floating point tolerance)
+    total = payload.w_cpu + payload.w_ram + payload.w_io + payload.w_e
+    if abs(total - 1.0) > 0.001:
+        raise HTTPException(status_code=400, detail="weights do not sum to 1.0")
+
+    # Update global weights for the DE-WOA fitness function
+    W_CPU, W_RAM, W_IO, W_E = payload.w_cpu, payload.w_ram, payload.w_io, payload.w_e
+    
+    # Save metadata
+    _current_weights_meta = {
+        "source": payload.source,
+        "bottleneck": payload.bottleneck,
+        "confidence": payload.confidence,
+        "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    }
+    
+    return {"status": "ok", "applied_at": _current_weights_meta["last_updated"]}
+
+
+@app.get("/weights")
+def get_weights():
+    """
+    Called by the AutoGen agent to explain to the administrator 
+    why specific resources are currently prioritized.
+    """
+    return {
+        "w_cpu": W_CPU,
+        "w_ram": W_RAM,
+        "w_io": W_IO,
+        "w_e": W_E,
+        **_current_weights_meta
+    }
