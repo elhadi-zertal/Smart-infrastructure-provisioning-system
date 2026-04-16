@@ -71,7 +71,9 @@ FEATURE_COLS = [
 ]
 
 TARGET_WEIGHTS = ["w_cpu", "w_ram", "w_io", "w_energy"]
-TARGET_THRESH  = ["thresh_cpu", "thresh_ram", "thresh_http"]
+TARGET_WARN    = ['thresh_cpu_warn', 'thresh_ram_warn', 'thresh_http_warn']
+TARGET_CRIT    = ['thresh_cpu_crit', 'thresh_ram_crit', 'thresh_http_crit']
+ALL_TARGETS    = TARGET_WEIGHTS + TARGET_WARN + TARGET_CRIT
 ALL_TARGETS    = TARGET_WEIGHTS + TARGET_THRESH
 
 # ─────────────────────────────────────────────
@@ -85,15 +87,11 @@ _tree_counts:   dict[str, int]  = {}
 
 # Current cluster config — updated after every /sync
 _current_config: dict = {
-    "w_cpu"       : 0.35,
-    "w_ram"       : 0.35,
-    "w_io"        : 0.15,
-    "w_energy"    : 0.15,
-    "thresh_cpu"  : 80.0,
-    "thresh_ram"  : 85.0,
-    "thresh_http" : 2.0,
+    "w_cpu": 0.35, "w_ram": 0.35, "w_io": 0.15, "w_energy": 0.15,
+    "thresh_cpu_warn": 64.0,  "thresh_cpu_crit": 80.0,
+    "thresh_ram_warn": 72.0,  "thresh_ram_crit": 85.0,
+    "thresh_http_warn": 1.1,  "thresh_http_crit": 2.0,
 }
-
 
 # ─────────────────────────────────────────────
 #  Model loading
@@ -203,10 +201,18 @@ def _predict_cluster_config(X: pd.DataFrame) -> dict:
     worker_mask = X["is_worker"].values == 1
     thresh_mask = worker_mask & up_mask if worker_mask.sum() > 0 else up_mask
 
+    cpu_crit  = round(float(np.clip(preds["thresh_cpu_crit" ][thresh_mask].mean(), 55.0, 95.0)), 2)
+    ram_crit  = round(float(np.clip(preds["thresh_ram_crit" ][thresh_mask].mean(), 60.0, 95.0)), 2)
+    http_crit = round(float(np.clip(preds["thresh_http_crit"][thresh_mask].mean(),  0.3,  5.0)), 3)
+
+    cpu_warn  = round(min(float(np.clip(preds["thresh_cpu_warn" ][thresh_mask].mean(), 40.0, 94.0)), cpu_crit  - 2.0), 2)
+    ram_warn  = round(min(float(np.clip(preds["thresh_ram_warn" ][thresh_mask].mean(), 50.0, 94.0)), ram_crit  - 2.0), 2)
+    http_warn = round(min(float(np.clip(preds["thresh_http_warn"][thresh_mask].mean(),  0.1,  4.9)), http_crit - 0.1), 3)
+
     thresholds = {
-        "thresh_cpu"  : round(float(np.clip(preds["thresh_cpu" ][thresh_mask].mean(), 50.0, 95.0)), 2),
-        "thresh_ram"  : round(float(np.clip(preds["thresh_ram" ][thresh_mask].mean(), 55.0, 95.0)), 2),
-        "thresh_http" : round(float(np.clip(preds["thresh_http"][thresh_mask].mean(),  0.1,  5.0)), 3),
+        "thresh_cpu_crit": cpu_crit,   "thresh_cpu_warn": cpu_warn,
+        "thresh_ram_crit": ram_crit,   "thresh_ram_warn": ram_warn,
+        "thresh_http_crit": http_crit, "thresh_http_warn": http_warn,
     }
 
     return {**weights, **thresholds}
@@ -311,9 +317,12 @@ class ClusterConfig(BaseModel):
     w_ram       : float
     w_io        : float
     w_energy    : float
-    thresh_cpu  : float = Field(..., description="CPU alert threshold (%)")
-    thresh_ram  : float = Field(..., description="RAM alert threshold (%)")
-    thresh_http : float = Field(..., description="HTTP 5xx alert threshold (rate)")
+    thresh_cpu_warn  : float
+    thresh_cpu_crit  : float
+    thresh_ram_warn  : float
+    thresh_ram_crit  : float
+    thresh_http_warn : float
+    thresh_http_crit : float
 
 
 class SyncResponse(BaseModel):
