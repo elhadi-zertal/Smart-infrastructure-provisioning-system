@@ -86,6 +86,10 @@ import random
 import urllib.parse
 import urllib.request
 from collections import deque
+from datetime import datetime, timezone
+import httpx          # pip install httpx
+import yaml           # pip install pyyaml
+from pathlib import Path
 
 # ─────────────────────────────────────────────
 #  Logging
@@ -155,6 +159,16 @@ DE_WOA_CR           = float(os.getenv("DE_WOA_CR",         "0.5"))
 DE_WOA_B            = float(os.getenv("DE_WOA_B",          "1.0"))
 DE_WOA_WOA_FRACTION = float(os.getenv("DE_WOA_WOA_FRACTION","0.5"))
 
+# ── ML Service integration ────────────────────────────────────────────────────
+ML_SERVICE_URL      = os.getenv("ML_SERVICE_URL",      "http://localhost:8001")
+ML_SYNC_INTERVAL    = int(os.getenv("ML_SYNC_INTERVAL", "300"))   # seconds (5 min)
+ML_REQUEST_TIMEOUT  = int(os.getenv("ML_REQUEST_TIMEOUT", "30"))  # seconds
+ML_ENABLED          = os.getenv("ML_ENABLED", "true").lower() == "true"
+
+# Prometheus alert rule file — rewritten by the ML sync job
+ALERTS_YML_PATH       = Path(os.getenv("ALERTS_YML_PATH",  "./alerts.yml"))
+PROMETHEUS_URL_RELOAD = os.getenv("PROMETHEUS_URL_RELOAD", "http://localhost:9090")
+
 # Fitness weights — must sum to exactly 1.0 (validated at startup)
 W_CPU = float(os.getenv("W_CPU", "0.35"))
 W_RAM = float(os.getenv("W_RAM", "0.35"))
@@ -177,6 +191,22 @@ MIN_HISTORY_SAMPLES = int(os.getenv("MIN_HISTORY_SAMPLES", "30"))
 _delta_history: dict[str, deque[float]] = {
     metric: deque(maxlen=HISTORY_WINDOW)
     for metric in ("cpu", "ram", "io", "energy")
+}
+
+# Rolling 5-minute buffer of VM metric snapshots for the ML service.
+# poll_cluster() (runs every 10 s) appends one entry per VM per cycle.
+# ml_sync_job() (runs every 5 min) drains this buffer and POSTs it.
+_ml_snapshot_buffer: deque[dict] = deque(maxlen=500)   # ~500 = 5 min × 10 VMs
+
+# Last ML-predicted config (updated after every successful /sync)
+_ml_config: dict = {
+    "w_cpu"       : W_CPU,
+    "w_ram"       : W_RAM,
+    "w_io"        : W_IO,
+    "w_energy"    : W_E,
+    "thresh_cpu"  : 80.0,
+    "thresh_ram"  : 85.0,
+    "thresh_http" : 2.0,
 }
 
 # ─────────────────────────────────────────────
@@ -327,6 +357,15 @@ class VMResources(BaseModel):
     disk:    Optional[str] = None
     disk_id: Optional[str] = "scsi0"
 
+class WeightsUpdate(BaseModel):
+    w_cpu: float
+    w_ram: float
+    w_io: float
+    w_e: float
+    source: str = "xgboost"
+    bottleneck: str = "unknown"
+    confidence: float = 0.0
+
 
 # ─────────────────────────────────────────────
 #  In-memory cluster state
@@ -340,6 +379,13 @@ cluster_state: dict = {
 
 _state_lock  = asyncio.Lock()
 warning_queue: list[dict] = []
+
+_current_weights_meta = {
+    "source": "static_env",
+    "bottleneck": "None",
+    "confidence": 1.0,
+    "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+}
 
 
 # ─────────────────────────────────────────────
@@ -479,6 +525,270 @@ def diff_proxmox_states(old: dict, new: dict) -> dict:
     }
 
 
+def _collect_ml_snapshot(vm: dict, instance_id: str) -> None:
+    """
+    Builds one metric snapshot from a VM's current state and appends
+    it to _ml_snapshot_buffer. Called from inside poll_cluster() for
+    every live VM.
+    """
+    cpu_pct = float(vm.get("cpu",    0.0)) * 100.0
+    max_mem = float(vm.get("maxmem", 1))
+    ram_pct = (1.0 - float(vm.get("mem", 0)) / max(max_mem, 1)) * 100.0
+
+    disk_bps = float(vm.get("diskread", 0)) + float(vm.get("diskwrite", 0))
+    io_pct   = min(disk_bps / NODE_IO_CAPACITY_BPS * 100.0, 100.0)
+
+    power_microwatts = vm.get("energy_actual", 0)
+    if not power_microwatts:
+        power_watts = 40.0 + (80.0 * (cpu_pct / 100.0))
+    else:
+        power_watts = power_microwatts / 1_000_000
+
+    http_5xx_rate = float(vm.get("http_5xx_rate", 0.0))
+    net_drop_rate = float(vm.get("net_drop_rate", 0.0))
+
+    ip = str(instance_id).split(":")[0]
+    if ip.startswith("10.10.10."): vlan = "vlan-1-app"
+    elif ip.startswith("10.20.20."): vlan = "vlan-2-app"
+    elif ip.startswith("10.30.30."): vlan = "vlan-monitoring"
+    else: vlan = "wan"
+
+    _ml_snapshot_buffer.append({
+        "instance"        : str(instance_id),
+        "vm_name"         : vm.get("name", str(vm.get("vmid", instance_id))),
+        "vlan"            : vlan,
+        "up"              : 1.0 if vm.get("status") == "running" else 0.0,
+        "scrape_duration" : float(vm.get("scrape_duration", 0.1)),
+        "cpu_pct"         : round(cpu_pct,  3),
+        "ram_pct"         : round(ram_pct,  3),
+        "io_pct"          : round(io_pct,   3),
+        "http_5xx_rate"   : round(http_5xx_rate, 5),
+        "net_drop_rate"   : round(net_drop_rate,  5),
+        "power_watts"     : round(power_watts,    3),
+    })
+
+
+def _rewrite_alerts_yml(thresh_cpu: float, thresh_ram: float, thresh_http: float) -> None:
+    """
+    Overwrite ALERTS_YML_PATH with Prometheus alert rules that use the
+    ML-predicted thresholds, then signal Prometheus to reload its config.
+    """
+    rules = {
+        "groups": [
+            {
+                "name": "adaptive_cluster_alerts",
+                "rules": [
+                    {
+                        "alert": "HighCPU_Warning",
+                        "expr": (
+                            f"100 - (avg by(instance) "
+                            f"(rate(node_cpu_seconds_total{{mode='idle'}}[2m])) * 100) "
+                            f"> {thresh_cpu * 0.85:.1f}"
+                        ),
+                        "for": "2m",
+                        "labels"     : {"severity": "warning", "type": "cpu"},
+                        "annotations": {
+                            "summary"    : "CPU usage above warning threshold",
+                            "description": (
+                                f"Instance {{{{ $labels.instance }}}} CPU > "
+                                f"{thresh_cpu * 0.85:.1f}% (ML threshold)."
+                            ),
+                        },
+                    },
+                    {
+                        "alert": "HighCPU_Critical",
+                        "expr": (
+                            f"100 - (avg by(instance) "
+                            f"(rate(node_cpu_seconds_total{{mode='idle'}}[2m])) * 100) "
+                            f"> {thresh_cpu:.1f}"
+                        ),
+                        "for": "1m",
+                        "labels"     : {"severity": "critical", "type": "cpu"},
+                        "annotations": {
+                            "summary"    : "CPU usage above critical threshold",
+                            "description": (
+                                f"Instance {{{{ $labels.instance }}}} CPU > "
+                                f"{thresh_cpu:.1f}% (ML threshold)."
+                            ),
+                        },
+                    },
+                    {
+                        "alert": "HighMemory_Warning",
+                        "expr": (
+                            f"(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) "
+                            f"* 100 > {thresh_ram * 0.90:.1f}"
+                        ),
+                        "for": "2m",
+                        "labels"     : {"severity": "warning", "type": "memory"},
+                        "annotations": {
+                            "summary": "Memory usage above warning threshold",
+                            "description": (
+                                f"Instance {{{{ $labels.instance }}}} RAM > "
+                                f"{thresh_ram * 0.90:.1f}% (ML threshold)."
+                            ),
+                        },
+                    },
+                    {
+                        "alert": "HighMemory_Critical",
+                        "expr": (
+                            f"(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) "
+                            f"* 100 > {thresh_ram:.1f}"
+                        ),
+                        "for": "1m",
+                        "labels"     : {"severity": "critical", "type": "memory"},
+                        "annotations": {
+                            "summary": "Memory usage above critical threshold",
+                            "description": (
+                                f"Instance {{{{ $labels.instance }}}} RAM > "
+                                f"{thresh_ram:.1f}% (ML threshold)."
+                            ),
+                        },
+                    },
+                    {
+                        "alert": "High5xxRate_Warning",
+                        "expr": (
+                            f"rate(http_requests_total{{status=~'5..'}}[5m]) / "
+                            f"rate(http_requests_total[5m]) > {thresh_http * 0.5:.4f}"
+                        ),
+                        "for": "2m",
+                        "labels"     : {"severity": "warning", "type": "http_5xx"},
+                        "annotations": {
+                            "summary": "HTTP 5xx rate above warning threshold",
+                        },
+                    },
+                    {
+                        "alert": "High5xxRate_Critical",
+                        "expr": (
+                            f"rate(http_requests_total{{status=~'5..'}}[5m]) / "
+                            f"rate(http_requests_total[5m]) > {thresh_http / 100:.4f}"
+                        ),
+                        "for": "1m",
+                        "labels"     : {"severity": "critical", "type": "http_5xx"},
+                        "annotations": {
+                            "summary": "HTTP 5xx rate above critical threshold",
+                        },
+                    },
+                    {
+                        "alert": "NodeDown",
+                        "expr": "up == 0",
+                        "for": "1m",
+                        "labels"     : {"severity": "critical", "type": "network"},
+                        "annotations": {
+                            "summary"    : "Node unreachable",
+                            "description": "Instance {{{{ $labels.instance }}}} is down.",
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+
+    ALERTS_YML_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(ALERTS_YML_PATH, "w") as f:
+        yaml.dump(rules, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+    logger.info(
+        f"alerts.yml rewritten → thresh_cpu={thresh_cpu}, "
+        f"thresh_ram={thresh_ram}, thresh_http={thresh_http}"
+    )
+
+    try:
+        req = urllib.request.Request(
+            f"{PROMETHEUS_URL_RELOAD}/-/reload",
+            method="POST",
+            headers={"Content-Length": "0"},
+        )
+        with urllib.request.urlopen(req, timeout=5):
+            pass
+        logger.info("Prometheus reloaded successfully.")
+    except Exception as exc:
+        _throttled_warning("prometheus:reload", f"Prometheus reload failed: {exc}")
+
+
+async def ml_sync_job() -> None:
+    """
+    Scheduled every 5 minutes by APScheduler.
+
+    1. Drain the snapshot buffer (collect last 5-min of metrics)
+    2. POST to ml_service /sync
+    3. On success:
+       a. Update global DE-WOA weights (W_CPU, W_RAM, W_IO, W_E)
+       b. Update internal threshold variables
+       c. Rewrite alerts.yml + reload Prometheus
+    """
+    global W_CPU, W_RAM, W_IO, W_E, _ml_config
+
+    if not ML_ENABLED:
+        return
+
+    snapshots = list(_ml_snapshot_buffer)
+    _ml_snapshot_buffer.clear()
+
+    if len(snapshots) == 0:
+        logger.warning("ml_sync_job: buffer empty, skipping this cycle.")
+        return
+
+    logger.info(f"ml_sync_job: sending {len(snapshots)} snapshots to ML service...")
+
+    payload = {
+        "snapshots": snapshots,
+        "sent_at"  : __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=ML_REQUEST_TIMEOUT) as client:
+            response = await client.post(f"{ML_SERVICE_URL}/sync", json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+    except httpx.TimeoutException:
+        logger.error(f"ml_sync_job: request timed out after {ML_REQUEST_TIMEOUT}s.")
+        return
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"ml_sync_job: ML service returned {exc.response.status_code}: {exc.response.text}")
+        return
+    except Exception as exc:
+        logger.error(f"ml_sync_job: unexpected error — {exc}")
+        return
+
+    cfg = data.get("config", {})
+
+    new_w_cpu = float(cfg.get("w_cpu",    W_CPU))
+    new_w_ram = float(cfg.get("w_ram",    W_RAM))
+    new_w_io  = float(cfg.get("w_io",     W_IO ))
+    new_w_e   = float(cfg.get("w_energy", W_E  ))
+
+    w_sum = new_w_cpu + new_w_ram + new_w_io + new_w_e
+    if abs(w_sum - 1.0) > 0.01:
+        logger.warning(f"ml_sync_job: weights sum to {w_sum:.4f}, normalising.")
+        new_w_cpu /= w_sum
+        new_w_ram /= w_sum
+        new_w_io  /= w_sum
+        new_w_e   /= w_sum
+
+    W_CPU = new_w_cpu
+    W_RAM = new_w_ram
+    W_IO  = new_w_io
+    W_E   = new_w_e
+
+    _ml_config = cfg
+
+    await asyncio.to_thread(
+        _rewrite_alerts_yml,
+        float(cfg.get("thresh_cpu",  80.0)),
+        float(cfg.get("thresh_ram",  85.0)),
+        float(cfg.get("thresh_http",  2.0)),
+    )
+
+    logger.info(
+        f"ml_sync_job: applied new config — "
+        f"w=({W_CPU:.3f}, {W_RAM:.3f}, {W_IO:.3f}, {W_E:.3f}) | "
+        f"thresh_cpu={cfg.get('thresh_cpu')} "
+        f"thresh_ram={cfg.get('thresh_ram')} "
+        f"thresh_http={cfg.get('thresh_http')}"
+    )
+
+
 async def poll_cluster() -> None:
     global cluster_state
     try:
@@ -508,6 +818,8 @@ async def poll_cluster() -> None:
                     io = vm.get("io_actual")
                     if io is not None:
                         node_io_sum[node] = node_io_sum.get(node, 0.0) + io
+
+                _collect_ml_snapshot(vm, f"{vm.get('ip', vmid)}:9100")
 
         for node_name, watts in node_energy_sum.items():
             if node_name in proxmox["nodes"]:
@@ -1497,6 +1809,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.add_job(poll_cluster,          "interval", seconds=10, max_instances=1)
     scheduler.add_job(process_warning_queue, "interval", seconds=30, max_instances=1)
+    scheduler.add_job(ml_sync_job,           "interval", seconds=ML_SYNC_INTERVAL, max_instances=1)
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -1705,3 +2018,82 @@ def scale_deployment_replicas(namespace: str, deployment: str, replicas: int):
         return {"status": "ok", "deployment": f"{namespace}/{deployment}", "replicas": replicas}
     except ApiException as e:
         raise HTTPException(500, str(e))
+
+
+# ─────────────────────────────────────────────
+#  AI Layer & Data Engineering Endpoints (Phase 3)
+# ─────────────────────────────────────────────
+
+@app.get("/cluster-snapshot")
+def get_cluster_snapshot():
+    """
+    Called by the XGBoost service every 10s to build the Feature Vector (X).
+    Combines the current cluster state with the rolling delta-history stats.
+    """
+    stats = delta_history_stats()
+    return {
+        "nodes": cluster_state["nodes"],
+        "vms": cluster_state["vms"],
+        "lxc": cluster_state["lxc"],
+        "deployments": cluster_state["deployments"],
+        "delta_history_stats": stats
+    }
+
+
+@app.post("/weights")
+def update_weights(payload: WeightsUpdate):
+    """
+    Receives dynamic fitness function weights from the XGBoost ML Service.
+    """
+    global W_CPU, W_RAM, W_IO, W_E, _current_weights_meta
+    
+    # Validate sum is 1.0 (with small floating point tolerance)
+    total = payload.w_cpu + payload.w_ram + payload.w_io + payload.w_e
+    if abs(total - 1.0) > 0.001:
+        raise HTTPException(status_code=400, detail="weights do not sum to 1.0")
+
+    # Update global weights for the DE-WOA fitness function
+    W_CPU, W_RAM, W_IO, W_E = payload.w_cpu, payload.w_ram, payload.w_io, payload.w_e
+    
+    # Save metadata
+    _current_weights_meta = {
+        "source": payload.source,
+        "bottleneck": payload.bottleneck,
+        "confidence": payload.confidence,
+        "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    }
+    
+    return {"status": "ok", "applied_at": _current_weights_meta["last_updated"]}
+
+
+@app.get("/weights")
+def get_weights():
+    """
+    Called by the AutoGen agent to explain to the administrator 
+    why specific resources are currently prioritized.
+    """
+    return {
+        "w_cpu": W_CPU,
+        "w_ram": W_RAM,
+        "w_io": W_IO,
+        "w_e": W_E,
+        **_current_weights_meta
+    }
+
+
+@app.get("/ml-config")
+def get_ml_config():
+    """Returns the last ML-predicted cluster config and current DE-WOA weights."""
+    return {
+        "de_woa_weights": {
+            "W_CPU": W_CPU,
+            "W_RAM": W_RAM,
+            "W_IO" : W_IO,
+            "W_E"  : W_E,
+        },
+        "ml_predicted_config"  : _ml_config,
+        "alerts_yml_path"      : str(ALERTS_YML_PATH),
+        "ml_service_url"       : ML_SERVICE_URL,
+        "ml_sync_interval_sec" : ML_SYNC_INTERVAL,
+        "buffer_size"          : len(_ml_snapshot_buffer),
+    }
