@@ -3,7 +3,8 @@ global:
   evaluation_interval: 15s
 
 rule_files:
-  - /home/oussama/prometheus/rules/*.yml
+ - /etc/prometheus/rules/*.yml
+
 
 scrape_configs:
   - job_name: 'prometheus'
