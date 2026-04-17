@@ -25,6 +25,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,9 +51,9 @@ logger = logging.getLogger("ml_service")
 # ─────────────────────────────────────────────
 #  Config from environment
 # ─────────────────────────────────────────────
-MODELS_DIR       = Path(os.getenv("MODELS_DIR",       "./models"))
-N_NEW_TREES      = int(os.getenv("ML_NEW_TREES",       "20"))
-MIN_BATCH_ROWS   = int(os.getenv("ML_MIN_BATCH_ROWS",  "10"))
+MODELS_DIR     = Path(os.getenv("MODELS_DIR",       "./models"))
+N_NEW_TREES    = int(os.getenv("ML_NEW_TREES",       "20"))
+MIN_BATCH_ROWS = int(os.getenv("ML_MIN_BATCH_ROWS",  "100"))   # CORRECTION BUG 6 : 10 → 100
 
 # Feature columns — MUST match what the notebook trained on
 FEATURE_COLS = [
@@ -70,22 +71,26 @@ FEATURE_COLS = [
     "vlan_enc",
 ]
 
+# CORRECTION BUG 3 + BUG 4 :
+# - TARGET_THRESH était utilisé mais jamais défini → NameError
+# - Le notebook produit 7 modèles avec ces noms exacts
+# - ml_service attendait 10 modèles avec warn/crit séparés → mismatch
+# → On aligne sur les 7 cibles du notebook. Les seuils warn sont
+#   dérivés des seuils crit à la prédiction (warn = crit - marge).
 TARGET_WEIGHTS = ["w_cpu", "w_ram", "w_io", "w_energy"]
-TARGET_WARN    = ['thresh_cpu_warn', 'thresh_ram_warn', 'thresh_http_warn']
-TARGET_CRIT    = ['thresh_cpu_crit', 'thresh_ram_crit', 'thresh_http_crit']
-ALL_TARGETS    = TARGET_WEIGHTS + TARGET_WARN + TARGET_CRIT
-ALL_TARGETS    = TARGET_WEIGHTS + TARGET_THRESH
+TARGET_THRESH  = ["thresh_cpu", "thresh_ram", "thresh_http"]   # ← aligné notebook
+ALL_TARGETS    = TARGET_WEIGHTS + TARGET_THRESH                 # 7 modèles au total
 
 # ─────────────────────────────────────────────
 #  Global state
 # ─────────────────────────────────────────────
-_boosters:      dict[str, xgb.Booster] = {}
-_vlan_encoder   = None          # LabelEncoder loaded from models/
-_update_lock    = asyncio.Lock() # Only one incremental update at a time
+_boosters:       dict[str, xgb.Booster] = {}
+_vlan_encoder    = None
+_update_lock     = asyncio.Lock()
 _last_update_ts: Optional[float] = None
-_tree_counts:   dict[str, int]  = {}
+_tree_counts:    dict[str, int]   = {}
 
-# Current cluster config — updated after every /sync
+# Config par défaut (utilisée avant le premier /sync)
 _current_config: dict = {
     "w_cpu": 0.35, "w_ram": 0.35, "w_io": 0.15, "w_energy": 0.15,
     "thresh_cpu_warn": 64.0,  "thresh_cpu_crit": 80.0,
@@ -97,7 +102,7 @@ _current_config: dict = {
 #  Model loading
 # ─────────────────────────────────────────────
 def _load_models() -> None:
-    """Load all .ubj boosters and the VLAN encoder from MODELS_DIR."""
+    """Load all 7 .ubj boosters and the VLAN encoder from MODELS_DIR."""
     global _boosters, _vlan_encoder, _tree_counts
 
     missing = [t for t in ALL_TARGETS if not (MODELS_DIR / f"{t}.ubj").exists()]
@@ -128,8 +133,6 @@ def _load_models() -> None:
 
 # ─────────────────────────────────────────────
 #  Feature engineering
-#  (main.py already sends computed rates,
-#   so this is mostly mapping + role flags)
 # ─────────────────────────────────────────────
 def _build_features(snapshots: list[dict]) -> pd.DataFrame:
     """
@@ -141,10 +144,9 @@ def _build_features(snapshots: list[dict]) -> pd.DataFrame:
         vm_name  = s["vm_name"].lower()
         vlan_raw = s["vlan"]
 
-        # VLAN ordinal encoding
         if _vlan_encoder is not None:
-            known = set(_vlan_encoder.classes_)
-            safe  = vlan_raw if vlan_raw in known else _vlan_encoder.classes_[0]
+            known    = set(_vlan_encoder.classes_)
+            safe     = vlan_raw if vlan_raw in known else _vlan_encoder.classes_[0]
             vlan_enc = int(_vlan_encoder.transform([safe])[0])
         else:
             vlan_enc = 0
@@ -152,9 +154,9 @@ def _build_features(snapshots: list[dict]) -> pd.DataFrame:
         rows.append({
             "up"                      : float(s["up"]),
             "scrape_duration_seconds" : float(s["scrape_duration"]),
-            "cpu_busy_pct"            : float(np.clip(s["cpu_pct"],  0, 100)),
-            "ram_usage_pct"           : float(np.clip(s["ram_pct"],  0, 100)),
-            "io_util_pct"             : float(np.clip(s["io_pct"],   0, 100)),
+            "cpu_busy_pct"            : float(np.clip(s["cpu_pct"],       0, 100)),
+            "ram_usage_pct"           : float(np.clip(s["ram_pct"],       0, 100)),
+            "io_util_pct"             : float(np.clip(s["io_pct"],        0, 100)),
             "http_5xx_rate"           : float(np.clip(s["http_5xx_rate"], 0, 1)),
             "net_drop_rate"           : float(np.clip(s["net_drop_rate"], 0, 1)),
             "power_watts"             : float(s["power_watts"]),
@@ -172,46 +174,44 @@ def _build_features(snapshots: list[dict]) -> pd.DataFrame:
 # ─────────────────────────────────────────────
 def _predict_cluster_config(X: pd.DataFrame) -> dict:
     """
-    Run inference on every row in X, then aggregate to one cluster config.
+    Run inference on every row in X, aggregate to one cluster config.
 
-    Weights   → mean across all UP VMs, then re-normalised to sum to 1.
-    Thresholds → mean across k8s-worker VMs only (they are the scaling targets).
-                 Falls back to all VMs if no workers present.
+    Weights    → mean across all UP VMs, renormalisé à 1.0
+    Thresholds → mean sur les VMs worker (fallback : toutes les VMs)
+                 Les seuils warn sont dérivés des seuils crit (crit - marge fixe).
     """
     d = xgb.DMatrix(X, feature_names=FEATURE_COLS)
 
-    # Per-row predictions: shape (n_rows,) per target
     preds = {target: _boosters[target].predict(d) for target in ALL_TARGETS}
 
-    # ── Weights: average over UP VMs ──────────────────────────────────────────
+    # ── Poids : moyenne sur les VMs UP ──────────────────────────────────────
     up_mask = X["up"].values == 1.0
     if up_mask.sum() == 0:
-        up_mask = np.ones(len(X), dtype=bool)  # fallback: use all rows
+        up_mask = np.ones(len(X), dtype=bool)
 
     w_raw = {t: float(preds[t][up_mask].mean()) for t in TARGET_WEIGHTS}
-
-    # Clip negatives then normalise to sum to 1.0
     w_sum = sum(max(0.0, v) for v in w_raw.values())
     if w_sum > 0:
         weights = {t: round(max(0.0, w_raw[t]) / w_sum, 6) for t in TARGET_WEIGHTS}
     else:
         weights = {t: 0.25 for t in TARGET_WEIGHTS}
 
-    # ── Thresholds: average over worker VMs ───────────────────────────────────
+    # ── Seuils crit : moyenne sur les VMs worker ────────────────────────────
     worker_mask = X["is_worker"].values == 1
-    thresh_mask = worker_mask & up_mask if worker_mask.sum() > 0 else up_mask
+    thresh_mask = (worker_mask & up_mask) if worker_mask.sum() > 0 else up_mask
 
-    cpu_crit  = round(float(np.clip(preds["thresh_cpu_crit" ][thresh_mask].mean(), 55.0, 95.0)), 2)
-    ram_crit  = round(float(np.clip(preds["thresh_ram_crit" ][thresh_mask].mean(), 60.0, 95.0)), 2)
-    http_crit = round(float(np.clip(preds["thresh_http_crit"][thresh_mask].mean(),  0.3,  5.0)), 3)
+    cpu_crit  = round(float(np.clip(preds["thresh_cpu" ][thresh_mask].mean(), 55.0, 95.0)), 2)
+    ram_crit  = round(float(np.clip(preds["thresh_ram" ][thresh_mask].mean(), 60.0, 95.0)), 2)
+    http_crit = round(float(np.clip(preds["thresh_http"][thresh_mask].mean(),  0.3,  5.0)), 3)
 
-    cpu_warn  = round(min(float(np.clip(preds["thresh_cpu_warn" ][thresh_mask].mean(), 40.0, 94.0)), cpu_crit  - 2.0), 2)
-    ram_warn  = round(min(float(np.clip(preds["thresh_ram_warn" ][thresh_mask].mean(), 50.0, 94.0)), ram_crit  - 2.0), 2)
-    http_warn = round(min(float(np.clip(preds["thresh_http_warn"][thresh_mask].mean(),  0.1,  4.9)), http_crit - 0.1), 3)
+    # ── Seuils warn : dérivés de crit avec une marge fixe ──────────────────
+    cpu_warn  = round(max(40.0, cpu_crit  - 15.0), 2)
+    ram_warn  = round(max(50.0, ram_crit  - 13.0), 2)
+    http_warn = round(max(0.1,  http_crit -  0.9), 3)
 
     thresholds = {
-        "thresh_cpu_crit": cpu_crit,   "thresh_cpu_warn": cpu_warn,
-        "thresh_ram_crit": ram_crit,   "thresh_ram_warn": ram_warn,
+        "thresh_cpu_crit" : cpu_crit,  "thresh_cpu_warn" : cpu_warn,
+        "thresh_ram_crit" : ram_crit,  "thresh_ram_warn" : ram_warn,
         "thresh_http_crit": http_crit, "thresh_http_warn": http_warn,
     }
 
@@ -219,25 +219,25 @@ def _predict_cluster_config(X: pd.DataFrame) -> dict:
 
 
 # ─────────────────────────────────────────────
-#  Incremental update
+#  Incremental update (CORRECTION BUG 7 : rollback si dégradation)
 # ─────────────────────────────────────────────
 def _incremental_update_sync(X: pd.DataFrame, snapshots: list[dict]) -> dict:
     """
     Runs in a thread (called via asyncio.to_thread).
-    Appends N_NEW_TREES boosting rounds to each model using the new batch.
-    Since we don't have ground-truth targets in live data, we use the model's
-    own current predictions as soft labels — a form of self-supervised
-    continual adaptation that prevents catastrophic forgetting.
+    Appends N_NEW_TREES boosting rounds à chaque modèle.
+    Utilise les prédictions actuelles comme soft labels (self-supervised).
+
+    CORRECTION BUG 7 : si MAE empire de plus de 5%, rollback → le fichier
+    .ubj n'est pas écrasé et le booster en mémoire reste l'ancien.
     """
     global _tree_counts, _last_update_ts
 
-    # Soft labels: current model predictions on this batch
-    d_batch = xgb.DMatrix(X, feature_names=FEATURE_COLS)
+    d_batch     = xgb.DMatrix(X, feature_names=FEATURE_COLS)
     soft_labels = {t: _boosters[t].predict(d_batch) for t in ALL_TARGETS}
 
     params = {
         "max_depth"        : 6,
-        "learning_rate"    : 0.03,   # lower LR for incremental (more conservative)
+        "learning_rate"    : 0.01,   # faible pour l'update incrémental
         "subsample"        : 0.8,
         "colsample_bytree" : 0.8,
         "min_child_weight" : 3,
@@ -249,38 +249,62 @@ def _incremental_update_sync(X: pd.DataFrame, snapshots: list[dict]) -> dict:
 
     report = {}
     for target in ALL_TARGETS:
-        # MAE before
+        model_path  = MODELS_DIR / f"{target}.ubj"
+        backup_path = MODELS_DIR / f"{target}.ubj.bak"
+
         preds_before = _boosters[target].predict(d_batch)
         mae_before   = mean_absolute_error(soft_labels[target], preds_before)
 
-        # Append trees on top of existing booster
         d_labeled = xgb.DMatrix(X, label=soft_labels[target], feature_names=FEATURE_COLS)
-        updated = xgb.train(
+        updated   = xgb.train(
             params,
             d_labeled,
             num_boost_round = N_NEW_TREES,
-            xgb_model       = _boosters[target],   # ← warm-start: appends trees
+            xgb_model       = _boosters[target],
             verbose_eval    = False,
         )
 
         preds_after = updated.predict(d_batch)
         mae_after   = mean_absolute_error(soft_labels[target], preds_after)
 
-        # Overwrite in-memory booster and persist to disk
+        # CORRECTION BUG 7 : rollback si MAE empire de plus de 5%
+        if mae_after > mae_before * 1.05:
+            logger.warning(
+                f"[{target}] MAE dégradée ({mae_before:.5f} → {mae_after:.5f}) "
+                f"— rollback, modèle non écrasé"
+            )
+            report[target] = {
+                "mae_before"  : round(float(mae_before), 6),
+                "mae_after"   : round(float(mae_after),  6),
+                "trees_total" : _tree_counts[target],
+                "saved"       : False,
+                "status"      : "rollback",
+            }
+            continue   # on ne sauvegarde PAS le modèle dégradé
+
+        # Backup + sauvegarde uniquement si le modèle s'améliore
+        shutil.copy(model_path, backup_path)
+        updated.save_model(str(model_path))
+
         _boosters[target]    = updated
         _tree_counts[target] = updated.num_boosted_rounds()
-        updated.save_model(str(MODELS_DIR / f"{target}.ubj"))
+
+        delta  = mae_after - mae_before
+        status = "improved" if delta < 0 else "stable"
+        logger.info(f"[{target}] MAE {mae_before:.5f} → {mae_after:.5f}  ({status})")
 
         report[target] = {
             "mae_before"  : round(float(mae_before), 6),
             "mae_after"   : round(float(mae_after),  6),
             "trees_total" : _tree_counts[target],
+            "saved"       : True,
+            "status"      : status,
         }
 
     _last_update_ts = time.time()
     logger.info(
         f"Incremental update complete (+{N_NEW_TREES} trees). "
-        f"Total trees now: { {t: _tree_counts[t] for t in ALL_TARGETS} }"
+        f"Total trees: { {t: _tree_counts[t] for t in ALL_TARGETS} }"
     )
     return report
 
@@ -289,34 +313,34 @@ def _incremental_update_sync(X: pd.DataFrame, snapshots: list[dict]) -> dict:
 #  Pydantic schemas
 # ─────────────────────────────────────────────
 class VMSnapshot(BaseModel):
-    """One VM's metrics snapshot — sent by main.py every 10 s per VM."""
+    """One VM's metrics snapshot — sent by main.py every 5 min."""
     instance        : str   = Field(..., example="10.10.10.10:9100")
     vm_name         : str   = Field(..., example="k8s-worker-6")
     vlan            : str   = Field(..., example="vlan-1-app")
     up              : float = Field(..., ge=0.0, le=1.0)
     scrape_duration : float = Field(0.1,  ge=0.0)
-    cpu_pct         : float = Field(...,  ge=0.0, le=100.0, description="CPU usage 0–100")
-    ram_pct         : float = Field(...,  ge=0.0, le=100.0, description="RAM usage 0–100")
+    cpu_pct         : float = Field(...,  ge=0.0, le=100.0)
+    ram_pct         : float = Field(...,  ge=0.0, le=100.0)
     io_pct          : float = Field(0.0,  ge=0.0, le=100.0)
-    http_5xx_rate   : float = Field(0.0,  ge=0.0, le=1.0,  description="5xx / total requests")
-    net_drop_rate   : float = Field(0.0,  ge=0.0, le=1.0,  description="dropped / total packets")
+    http_5xx_rate   : float = Field(0.0,  ge=0.0, le=1.0)
+    net_drop_rate   : float = Field(0.0,  ge=0.0, le=1.0)
     power_watts     : float = Field(50.0, ge=0.0)
 
 
 class SyncRequest(BaseModel):
     """Payload sent by main.py every 5 minutes."""
     snapshots : List[VMSnapshot] = Field(..., min_length=1)
-    sent_at   : str              = Field(
+    sent_at   : str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
 
 
 class ClusterConfig(BaseModel):
     """Predicted cluster-level config returned to main.py."""
-    w_cpu       : float
-    w_ram       : float
-    w_io        : float
-    w_energy    : float
+    w_cpu            : float
+    w_ram            : float
+    w_io             : float
+    w_energy         : float
     thresh_cpu_warn  : float
     thresh_cpu_crit  : float
     thresh_ram_warn  : float
@@ -326,11 +350,11 @@ class ClusterConfig(BaseModel):
 
 
 class SyncResponse(BaseModel):
-    status       : str
-    config       : ClusterConfig
-    update_report: dict
-    n_samples    : int
-    updated_at   : str
+    status        : str
+    config        : ClusterConfig
+    update_report : dict
+    n_samples     : int
+    updated_at    : str
 
 
 # ─────────────────────────────────────────────
@@ -339,7 +363,7 @@ class SyncResponse(BaseModel):
 app = FastAPI(
     title       = "Cluster ML Service",
     description = "XGBoost adaptive weights & thresholds for DE-WOA cluster manager.",
-    version     = "1.0.0",
+    version     = "2.0.0",
 )
 
 
@@ -355,8 +379,6 @@ async def sync(request: SyncRequest):
     """
     Main endpoint called by main.py every 5 minutes.
 
-    Steps
-    -----
     1. Build feature matrix from the received snapshots
     2. Predict cluster-level config (weights + thresholds)
     3. Run incremental update in a background thread
@@ -371,27 +393,29 @@ async def sync(request: SyncRequest):
     if len(X) < MIN_BATCH_ROWS:
         raise HTTPException(
             422,
-            f"Batch too small: {len(X)} rows received, need ≥ {MIN_BATCH_ROWS}. "
-            "Returning last known config.",
+            f"Batch too small: {len(X)} rows received, need ≥ {MIN_BATCH_ROWS}.",
         )
 
-    # Predict BEFORE the update so main.py gets stable predictions
+    # Prédire AVANT l'update pour des prédictions stables
     config_dict = _predict_cluster_config(X)
 
-    # Incremental update runs in a thread — doesn't block the event loop
+    # Update incrémental dans un thread (ne bloque pas la boucle asyncio)
     async with _update_lock:
-        update_report = await asyncio.to_thread(_incremental_update_sync, X, snapshots_dicts)
+        update_report = await asyncio.to_thread(
+            _incremental_update_sync, X, snapshots_dicts
+        )
 
-    # Update global cache
     global _current_config
     _current_config = config_dict
 
+    # CORRECTION BUG 5 : les clés sont thresh_cpu_crit etc. (pas thresh_cpu)
     logger.info(
         f"/sync — {len(X)} samples | "
         f"w=({config_dict['w_cpu']:.3f}, {config_dict['w_ram']:.3f}, "
         f"{config_dict['w_io']:.3f}, {config_dict['w_energy']:.3f}) | "
-        f"thresh=({config_dict['thresh_cpu']}, {config_dict['thresh_ram']}, "
-        f"{config_dict['thresh_http']})"
+        f"cpu_crit={config_dict['thresh_cpu_crit']} "
+        f"ram_crit={config_dict['thresh_ram_crit']} "
+        f"http_crit={config_dict['thresh_http_crit']}"
     )
 
     return SyncResponse(
@@ -406,7 +430,7 @@ async def sync(request: SyncRequest):
 # ── GET /config ───────────────────────────────────────────────────────────────
 @app.get("/config", response_model=ClusterConfig)
 def get_config():
-    """Return the last computed cluster config without triggering a model update."""
+    """Retourne la dernière config calculée sans déclencher de mise à jour."""
     return ClusterConfig(**_current_config)
 
 
@@ -414,10 +438,10 @@ def get_config():
 @app.get("/health")
 def health():
     return {
-        "status"         : "ok",
-        "models_loaded"  : len(_boosters),
-        "models_ready"   : len(_boosters) == len(ALL_TARGETS),
-        "last_update"    : (
+        "status"              : "ok",
+        "models_loaded"       : len(_boosters),
+        "models_ready"        : len(_boosters) == len(ALL_TARGETS),
+        "last_update"         : (
             datetime.fromtimestamp(_last_update_ts, tz=timezone.utc).isoformat()
             if _last_update_ts else None
         ),
@@ -431,9 +455,10 @@ def health():
 @app.get("/model-info")
 def model_info():
     return {
-        "targets"     : ALL_TARGETS,
-        "feature_cols": FEATURE_COLS,
-        "tree_counts" : _tree_counts,
-        "models_dir"  : str(MODELS_DIR),
-        "n_new_trees_per_sync": N_NEW_TREES,
+        "targets"              : ALL_TARGETS,
+        "feature_cols"         : FEATURE_COLS,
+        "tree_counts"          : _tree_counts,
+        "models_dir"           : str(MODELS_DIR),
+        "n_new_trees_per_sync" : N_NEW_TREES,
+        "min_batch_rows"       : MIN_BATCH_ROWS,
     }
