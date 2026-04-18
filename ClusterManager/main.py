@@ -537,7 +537,9 @@ def _collect_ml_snapshot(vm: dict, instance_id: str) -> None:
     # Proxmox reports cpu as a ratio 0-1, mem/maxmem in bytes
     cpu_pct = float(vm.get("cpu",    0.0)) * 100.0
     max_mem = float(vm.get("maxmem", 1))
-    ram_pct = (1.0 - float(vm.get("mem", 0)) / max(max_mem, 1)) * 100.0
+    max_mem = float(vm.get("maxmem", 1))
+    mem_used = float(vm.get("mem", 0))
+    ram_pct = (mem_used / max(max_mem, 1)) * 100.0  # usage, not free
 
     # Disk IO: Proxmox gives diskread/diskwrite in bytes/s — normalise to %
     disk_bps = float(vm.get("diskread", 0)) + float(vm.get("diskwrite", 0))
@@ -2042,25 +2044,133 @@ def scale_deployment_replicas(namespace: str, deployment: str, replicas: int):
         return {"status": "ok", "deployment": f"{namespace}/{deployment}", "replicas": replicas}
     except ApiException as e:
         raise HTTPException(500, str(e))
+    
+
+@app.post("/vms/{vmid}/stop")
+def stop_vm(vmid: int):
+    """Gracefully shut down a running VM. High-risk action — called only after admin approval."""
+    vm = cluster_state["vms"].get(vmid)
+    if not vm: raise HTTPException(404, f"VM {vmid} not found")
+    try:
+        px.nodes(vm["node"]).qemu(vmid).status.stop.post()
+        return {"status": "ok", "vmid": vmid, "action": "stop"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    
+
+@app.post("/vms/{vmid}/restart")
+def restart_vm(vmid: int):
+    """Reboot a VM. Medium-risk action."""
+    vm = cluster_state["vms"].get(vmid)
+    if not vm: raise HTTPException(404, f"VM {vmid} not found")
+    try:
+        px.nodes(vm["node"]).qemu(vmid).status.reboot.post()
+        return {"status": "ok", "vmid": vmid, "action": "restart"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    
+
+@app.delete("/vms/{vmid}")
+def delete_vm(vmid: int):
+    """Permanently delete a VM. HIGH RISK — called only after admin email approval."""
+    vm = cluster_state["vms"].get(vmid)
+    if not vm: raise HTTPException(404, f"VM {vmid} not found")
+    try:
+        px.nodes(vm["node"]).qemu(vmid).delete()
+        return {"status": "ok", "vmid": vmid, "action": "deleted"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    
+
+@app.post("/lxc/{vmid}/stop")
+def stop_lxc(vmid: int):
+    ct = cluster_state["lxc"].get(vmid)
+    if not ct: raise HTTPException(404, f"LXC {vmid} not found")
+    try:
+        px.nodes(ct["node"]).lxc(vmid).status.stop.post()
+        return {"status": "ok", "vmid": vmid, "action": "stop"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    
+@app.post("/lxc/{vmid}/restart")
+def restart_lxc(vmid: int):
+    ct = cluster_state["lxc"].get(vmid)
+    if not ct: raise HTTPException(404, f"LXC {vmid} not found")
+    try:
+        px.nodes(ct["node"]).lxc(vmid).status.reboot.post()
+        return {"status": "ok", "vmid": vmid, "action": "restart"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/lxc/{vmid}")
+def delete_lxc(vmid: int):
+    ct = cluster_state["lxc"].get(vmid)
+    if not ct: raise HTTPException(404, f"LXC {vmid} not found")
+    try:
+        px.nodes(ct["node"]).lxc(vmid).delete()
+        return {"status": "ok", "vmid": vmid, "action": "deleted"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    
+
+@app.post("/vms/{vmid}/migrate")
+def migrate_vm(vmid: int, payload: dict):
+    """Live-migrate a VM to a different node for load balancing."""
+    target_node = payload.get("target_node")
+    if not target_node:
+        raise HTTPException(400, "target_node is required")
+    vm = cluster_state["vms"].get(vmid)
+    if not vm: raise HTTPException(404, f"VM {vmid} not found")
+    target_info = cluster_state["nodes"].get(target_node)
+    if not target_info or target_info.get("status") != "online":
+        raise HTTPException(400, f"Target node {target_node} is not online")
+    try:
+        px.nodes(vm["node"]).qemu(vmid).migrate.post(
+            target=target_node, online=1
+        )
+        return {"status": "ok", "vmid": vmid, "from": vm["node"], "to": target_node}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    
+
+@app.delete("/deployments/{namespace}/{name}")
+def delete_deployment(namespace: str, name: str):
+    """Delete a Kubernetes deployment entirely. HIGH RISK — called only after admin approval."""
+    if not k8s_apps:
+        raise HTTPException(503, "Kubernetes client not available")
+    try:
+        k8s_apps.delete_namespaced_deployment(name=name, namespace=namespace)
+        return {"status": "ok", "deployment": f"{namespace}/{name}", "action": "deleted"}
+    except ApiException as e:
+        raise HTTPException(500, str(e))
 
 
 # ─────────────────────────────────────────────
 #  AI Layer & Data Engineering Endpoints (Phase 3)
 # ─────────────────────────────────────────────
 
+
 @app.get("/cluster-snapshot")
-def get_cluster_snapshot():
-    """
-    Called by the XGBoost service every 10s to build the Feature Vector (X).
-    Combines the current cluster state with the rolling delta-history stats.
-    """
+async def get_cluster_snapshot():
     stats = delta_history_stats()
+    # Fetch prediction from ml_service
+    prediction = {}
+    try:
+        async with httpx.AsyncClient(timeout=3) as c:
+            r = await c.get(f"{ML_SERVICE_URL}/prediction")
+            prediction = r.json()
+    except Exception:
+        prediction = {"bottleneck": "unknown", "weights": {}, "confidence": 0.0}
+
     return {
-        "nodes": cluster_state["nodes"],
-        "vms": cluster_state["vms"],
-        "lxc": cluster_state["lxc"],
-        "deployments": cluster_state["deployments"],
-        "delta_history_stats": stats
+        "nodes":               cluster_state["nodes"],
+        "vms":                 cluster_state["vms"],
+        "lxc":                 cluster_state["lxc"],
+        "deployments":         cluster_state["deployments"],
+        "warning_queue":       warning_queue,
+        "delta_history_stats": stats,
+        "prediction":          prediction,
     }
 
 
@@ -2121,3 +2231,24 @@ def get_ml_config():
         "ml_sync_interval_sec" : ML_SYNC_INTERVAL,
         "buffer_size"          : len(_ml_snapshot_buffer),
     }
+
+
+
+@app.get("/prediction")
+async def get_prediction():
+    """Proxy to ML service: bottleneck class + weights + thresholds."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as c:
+            r = await c.get(f"{ML_SERVICE_URL}/prediction")
+            r.raise_for_status()
+            return r.json()
+    except Exception as e:
+        # Fallback to current weights if ML service is unavailable
+        return {
+            "bottleneck": "unknown",
+            "weights": {"CPU": W_CPU, "RAM": W_RAM, "IO": W_IO, "Energy": W_E},
+            "confidence": 0.0,
+            "error": str(e),
+        }
+    
+    

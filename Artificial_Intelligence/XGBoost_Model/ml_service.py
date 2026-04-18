@@ -462,3 +462,38 @@ def model_info():
         "n_new_trees_per_sync" : N_NEW_TREES,
         "min_batch_rows"       : MIN_BATCH_ROWS,
     }
+
+
+# ── GET /prediction ───────────────────────────────────────────────────────────
+@app.get("/prediction")
+def get_prediction():
+    cfg = _current_config
+    weights = {
+        "CPU":    cfg.get("w_cpu",    0.25),
+        "RAM":    cfg.get("w_ram",    0.25),
+        "IO":     cfg.get("w_io",     0.25),
+        "Energy": cfg.get("w_energy", 0.25),
+    }
+    # Bottleneck = dimension with the highest predicted weight
+    bottleneck = max(weights, key=weights.get)
+    # Confidence = gap between top and second weight
+    sorted_w = sorted(weights.values(), reverse=True)
+    confidence = round(sorted_w[0] - sorted_w[1], 4) if len(sorted_w) > 1 else 1.0
+
+    return {
+        "bottleneck":   bottleneck,       # "CPU" | "RAM" | "IO" | "Energy" | "None"
+        "weights":      weights,
+        "confidence":   confidence,
+        "thresholds": {
+            "cpu_warn":  cfg.get("thresh_cpu_warn"),
+            "cpu_crit":  cfg.get("thresh_cpu_crit"),
+            "ram_warn":  cfg.get("thresh_ram_warn"),
+            "ram_crit":  cfg.get("thresh_ram_crit"),
+            "http_warn": cfg.get("thresh_http_warn"),
+            "http_crit": cfg.get("thresh_http_crit"),
+        },
+        "last_updated": (
+            datetime.fromtimestamp(_last_update_ts, tz=timezone.utc).isoformat()
+            if _last_update_ts else None
+        ),
+    }

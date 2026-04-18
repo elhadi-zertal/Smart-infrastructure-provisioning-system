@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, logger
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -8,6 +8,7 @@ import time
 import asyncio
 import os
 from agents import run_planner, run_critic
+import sqlite3, json, time
 from tools import get_risk_level, scale_vm, clone_vm, scale_deployment
 from email_client import (
     send_approval_request,
@@ -37,27 +38,135 @@ executed_log: list[dict] = []
 scheduler = AsyncIOScheduler()
 
 
+
+
+DB_PATH = os.getenv("AGENT_DB_PATH", "./agent_state.db")
+
+def _init_db():
+    con = sqlite3.connect(DB_PATH)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS approval_queue (
+            action_id  TEXT PRIMARY KEY,
+            data       TEXT NOT NULL,
+            created_at REAL NOT NULL
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS executed_log (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp  REAL NOT NULL,
+            tool       TEXT,
+            inputs     TEXT,
+            result     TEXT,
+            triggered_by TEXT,
+            outcome TEXT,
+            action_id TEXT
+        )
+    """)
+    con.commit()
+    con.close()
+
+def _queue_save(action_id: str, entry: dict):
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "INSERT OR REPLACE INTO approval_queue VALUES (?,?,?)",
+        (action_id, json.dumps(entry), entry["created_at"])
+    )
+    con.commit(); con.close()
+
+def _queue_pop(action_id: str) -> dict | None:
+    con = sqlite3.connect(DB_PATH)
+    row = con.execute(
+        "SELECT data FROM approval_queue WHERE action_id=?", (action_id,)
+    ).fetchone()
+    if row:
+        con.execute("DELETE FROM approval_queue WHERE action_id=?", (action_id,))
+        con.commit()
+    con.close()
+    return json.loads(row[0]) if row else None
+
+def _queue_load_all() -> dict:
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute("SELECT action_id, data FROM approval_queue").fetchall()
+    con.close()
+    return {r[0]: json.loads(r[1]) for r in rows}
+
+def _log_save(entry: dict):
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "INSERT INTO executed_log (timestamp, tool, inputs, result, triggered_by) VALUES (?,?,?,?,?)",
+        (entry["timestamp"], entry["tool"],
+         json.dumps(entry["inputs"]), json.dumps(entry["result"]),
+         entry["triggered_by"])
+    )
+    con.commit(); con.close()
+
+    #On startup, call `_init_db()` and reload `approval_queue = _queue_load_all()`
+
+
+
 # ─────────────────────────────────────────────────────────────
 #  Core execution logic
 # ─────────────────────────────────────────────────────────────
 
 def execute_action(tool: str, inputs: dict) -> dict:
     """Execute a write action against the Alert Manager API."""
-    if tool == "scale_vm":
-        body = {k: v for k, v in inputs.items() if k != "vmid" and v is not None}
+    if tool == "scale_vm" or tool == "scale_down_vm":
+        body = {k: v for k, v in inputs.items() if k not in ("vmid",) and v is not None}
         r = requests.put(f"{BASE}/vms/{inputs['vmid']}/resources", json=body, timeout=10)
+
     elif tool == "clone_vm":
         r = requests.post(f"{BASE}/vms/{inputs['vmid']}/clone", timeout=30)
-    elif tool == "scale_deployment":
+
+    elif tool == "clone_lxc":
+        r = requests.post(f"{BASE}/lxc/{inputs['vmid']}/clone", timeout=30)
+
+    elif tool in ("scale_up_deployment", "scale_down_deployment"):
         r = requests.patch(
             f"{BASE}/deployments/{inputs['namespace']}/{inputs['name']}/replicas",
-            params={"replicas": inputs["replicas"]},
-            timeout=10
+            params={"replicas": inputs["replicas"]}, timeout=10
         )
-    else:
-        return {"status": "error", "detail": f"Unknown tool: {tool}"}
 
-    return r.json()
+    elif tool == "stop_vm":
+        r = requests.post(f"{BASE}/vms/{inputs['vmid']}/stop", timeout=30)
+
+    elif tool == "restart_vm":
+        r = requests.post(f"{BASE}/vms/{inputs['vmid']}/restart", timeout=30)
+
+    elif tool == "stop_lxc":
+        r = requests.post(f"{BASE}/lxc/{inputs['vmid']}/stop", timeout=30)
+
+    elif tool == "restart_lxc":
+        r = requests.post(f"{BASE}/lxc/{inputs['vmid']}/restart", timeout=30)
+
+    elif tool == "delete_vm":
+        r = requests.delete(f"{BASE}/vms/{inputs['vmid']}", timeout=30)
+
+    elif tool == "delete_lxc":
+        r = requests.delete(f"{BASE}/lxc/{inputs['vmid']}", timeout=30)
+
+    elif tool == "delete_deployment":
+        r = requests.delete(
+            f"{BASE}/deployments/{inputs['namespace']}/{inputs['name']}", timeout=30
+        )
+
+    elif tool == "migrate_vm":
+        r = requests.post(
+            f"{BASE}/vms/{inputs['vmid']}/migrate",
+            json={"target_node": inputs["target_node"]}, timeout=60
+        )
+
+    elif tool == "drain_node":
+        # Drain is informational — log and notify, no Proxmox API call
+        return {"status": "logged", "message": f"Node {inputs['node']} flagged for drain. Manual migration required."}
+
+    else:
+        return {"status": "error", "detail": f"Unknown or unimplemented tool: {tool}"}
+
+    try:
+        return r.json()
+    except Exception:
+        return {"status": "ok" if r.ok else "error", "http_status": r.status_code}
 
 
 def log_execution(tool: str, inputs: dict, result: dict, triggered_by: str = "autonomous"):
@@ -71,6 +180,39 @@ def log_execution(tool: str, inputs: dict, result: dict, triggered_by: str = "au
     })
     if len(executed_log) > 100:
         executed_log.pop()
+
+
+async def _check_outcome(tool: str, inputs: dict, action_id: str):
+    """Called 5 minutes after execution to check if the action actually resolved the issue."""
+    await asyncio.sleep(300)  # wait 5 minutes
+
+    outcome = "unknown"
+    try:
+        vmid = inputs.get("vmid")
+        if vmid and tool in ("scale_vm", "scale_down_vm", "restart_vm"):
+            vm = requests.get(f"{BASE}/vms/{vmid}", timeout=5).json()
+            cpu_util = vm.get("cpu", 0) * 100
+            outcome = "resolved" if cpu_util < 80 else "unresolved"
+
+        elif tool in ("scale_up_deployment", "scale_down_deployment"):
+            ns, name = inputs.get("namespace"), inputs.get("name")
+            dep = requests.get(f"{BASE}/deployments/{ns}/{name}", timeout=5).json()
+            ready = dep.get("ready_replicas", 0)
+            total = dep.get("replicas", 1)
+            outcome = "resolved" if ready == total else "unresolved"
+
+    except Exception as e:
+        outcome = f"check_failed: {e}"
+
+    # Save outcome to DB
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "UPDATE executed_log SET outcome=? WHERE action_id=?",
+        (outcome, action_id)
+    )
+    con.commit(); con.close()
+    logger.info(f"[outcome] {tool} {inputs} → {outcome}")
+    #Add `outcome TEXT` and `action_id TEXT` columns to `executed_log` table. After `log_execution()`, call `asyncio.create_task(_check_outcome(tool, inputs, action_id))`.
 
 
 def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict):

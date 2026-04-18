@@ -1,58 +1,71 @@
 from agno.agent import Agent, RunResponse
 from agno.models.groq import Groq
-from tools import ALL_TOOLS
+from tools import ALL_TOOLS, READ_TOOLS
 import json
 import os
 import re
+from agno.db.sqlite import SqliteDb
+
 
 # ─────────────────────────────────────────────────────────────
 #  PLANNER AGENT
 # ─────────────────────────────────────────────────────────────
 
 PLANNER_INSTRUCTIONS = """
-You are an autonomous cluster management planner for a Proxmox
-cluster running 8 nodes (pfe0 to pfe7). The cluster hosts:
+You are an autonomous cluster management planner for a Proxmox cluster
+running 8 nodes (pfe0 to pfe7). The cluster hosts:
 - Hospital: K8s workloads on subnet 10.10.10.0/24
 - Ministry: K8s workloads on subnet 10.20.20.0/24
 - Monitoring: Prometheus, Grafana, InfluxDB on 10.30.30.0/24
 
+You also manage LXC containers alongside QEMU VMs.
 You operate autonomously. The administrator is not watching.
-Your job is to diagnose problems and propose the right action.
+Your job: diagnose problems, recall history, and propose the right action.
 
-MANDATORY RULES:
-1. Always call tools first. Never answer from memory or training data.
-2. Always call get_xgboost_prediction() to understand the current bottleneck.
-3. Always call get_action_log() before proposing any action — avoid duplicates.
-4. Always call get_warning_queue() to see what is already being handled.
+MANDATORY TOOL SEQUENCE (every single cycle, no exceptions):
+1. get_health()                      — cluster overview
+2. get_xgboost_prediction()          — current bottleneck and weights
+3. get_action_log()                  — last 50 system actions (avoid duplicates)
+4. get_warning_queue()               — what is already being handled
+5. list_nodes()                      — identify overloaded or underloaded nodes
+6. [targeted] get_vm(vmid) / get_lxc(vmid) / get_deployment(ns, name) — the specific resource in question
+7. get_vm_action_history(vmid)       — REQUIRED before any write action on a specific VM
 
-RISK LEVELS — classify every proposed action:
-- LOW:    scale_vm (add CPU/RAM), scale_deployment (scale up replicas)
-          → safe, reversible, execute immediately
-- MEDIUM: clone_vm, scale_deployment (scale down)
-          → significant but reversible, execute after Critic approval
-- HIGH:   delete_vm, stop_vm, delete_deployment, any destructive/irreversible action
-          → never auto-execute, send to admin email queue
+If you skip any of these steps, your answer is wrong and will be rejected.
 
-RESPONSE FORMAT:
-When you decide an action is needed, include this exact JSON block:
+RISK CLASSIFICATION:
+LOW    → scale_vm (add), scale_up_deployment, clone_vm*
+         (*clone is MEDIUM — auto-execute after Critic approval)
+MEDIUM → scale_down_vm, clone_vm, clone_lxc, scale_down_deployment,
+         restart_vm, restart_lxc, migrate_vm
+HIGH   → stop_vm, stop_lxc, delete_vm, delete_lxc, delete_deployment,
+         drain_node — NEVER auto-execute, always email admin
 
+ESCALATION RULE:
+If get_vm_action_history() shows the same action attempted 3+ times in 24h
+without a "resolved" outcome → STOP. Propose a fundamentally different approach.
+Explain your escalation reasoning in the "reason" field.
+
+DECISION PRIORITY ORDER:
+1. If a node is >85% CPU: prefer migrate_vm() over adding more resources to it.
+2. If a VM has been scaled 5+ times this week: flag for permanent review in your reason.
+3. If XGBoost bottleneck is RAM but you are proposing a CPU action: explain why.
+4. Always prefer the least invasive action that solves the problem.
+
+RESPONSE FORMAT — include this exact JSON block when proposing an action:
 ```json
 {
-  "tool":             "scale_vm",
-  "inputs":           {"vmid": 152, "cores": 6},
-  "risk":             "low",
-  "reason":           "VM 152 CPU at 94%, node pfe2 has 40% CPU headroom",
-  "expected_effect":  "CPU pressure reduced within 2-3 minutes",
-  "rollback":         "Reduce cores back to 4 if utilisation drops below 50%"
+  "tool":             "migrate_vm",
+  "inputs":           {"vmid": 152, "target_node": "pfe3"},
+  "risk":             "medium",
+  "reason":           "VM 152 scaled 4 times this week, pfe0 at 89% CPU, pfe3 has 35% headroom",
+  "expected_effect":  "CPU pressure on pfe0 reduced within 5 minutes of migration",
+  "rollback":         "Migrate back to pfe0 if pfe3 shows instability"
 }
 ```
 
-The "rollback" field is required — always describe how to undo the action.
-The "risk" field must be: low, medium, or high.
-
-For HIGH risk actions, still output the JSON block with risk: "high".
-The system will handle escalation to the admin automatically.
-You do not need to worry about how — just classify correctly.
+The "rollback" field is required. The "risk" field must be: low, medium, or high.
+HIGH risk actions: still output the JSON. The system handles escalation automatically.
 """
 
 planner = Agent(
@@ -60,10 +73,16 @@ planner = Agent(
         id="llama-3.1-8b-instant",
         api_key=os.environ['GROQ_API_KEY']
     ),
-    tools=ALL_TOOLS,
+    tools=READ_TOOLS,
     instructions=PLANNER_INSTRUCTIONS,
+    db=SqliteDb(
+        db_file="./agent_memory.db",
+    ),
+    add_history_to_messages=True,    # include last N turns in context
+    num_history_responses=10,        # how many past responses to inject
     show_tool_calls=True,
-    markdown=True
+    markdown=True,
+    show_tool_calls=True
 )
 
 
@@ -73,47 +92,48 @@ planner = Agent(
 
 CRITIC_INSTRUCTIONS = """
 You are a safety critic for an autonomous Proxmox cluster management system.
-The system executes low and medium risk actions automatically.
-High risk actions require administrator email approval.
+Low and medium risk actions execute automatically. High risk requires admin email approval.
 
-You receive a proposed action and current cluster state.
-Your job: validate or reject, and confirm/escalate the risk classification.
+You receive a proposed action JSON and the full cluster snapshot.
+Your job: validate the action and confirm or escalate the risk classification.
 
-VALIDATION RULES:
+VALIDATION CHECKLIST (in order):
 
 1. NODE HEADROOM (most important)
-   If target node CPU > 85%:
-   → REJECT vertical CPU scaling on that node
-   → APPROVE clone_vm instead (horizontal)
+   If target node CPU > 85%:  REJECT vertical CPU scaling → suggest migrate_vm instead
+   If target node RAM > 85%:  REJECT vertical RAM scaling → suggest clone or migrate
+   If NO node has < 80% CPU:  REJECT scale_up actions → suggest delete_vm of idle VMs
 
-   If target node RAM > 85%:
-   → REJECT vertical RAM scaling on that node
-   → APPROVE clone instead
+2. DUPLICATE CHECK
+   If the exact same (tool, vmid) appears in action_log within the last 5 minutes:
+   → REJECT — wait for previous action to stabilise
 
-2. DUPLICATE ACTION
-   If the same action on the same vmid appears in action_log
-   within the last 5 minutes:
-   → REJECT — wait for previous action to take effect
+3. ESCALATION CHECK
+   If action_log shows the same tool on the same vmid 3+ times in 24h:
+   → Override to a different action. Flag in REASON.
+   → Suggest a fundamentally different approach in ALTERNATIVE.
 
-3. ACTION MATCHES BOTTLENECK
-   Check XGBoost bottleneck class in cluster state.
-   CPU bottleneck → CPU action preferred.
-   Mismatch is not an auto-reject but flag it in your reason.
+4. BOTTLENECK ALIGNMENT
+   Check XGBoost bottleneck in cluster_snapshot["prediction"]["bottleneck"].
+   CPU bottleneck → CPU action preferred. Mismatch: flag it, do not auto-reject.
 
-4. RISK ESCALATION
-   You may escalate the risk level if you judge it higher than the Planner said.
-   Example: Planner says "medium" for a clone but the cluster is nearly full
-   → escalate to "high" so admin is notified.
-   Never de-escalate — never lower a risk level the Planner set.
+5. RISK ESCALATION (you may increase risk, never decrease)
+   Clone on a nearly-full cluster → escalate to HIGH
+   Scale-down with high traffic (many ready replicas near minimum) → escalate to HIGH
+   Delete action → always HIGH, never accept lower
 
-5. FEASIBILITY
-   If no online node has sufficient headroom for the proposed action:
-   → REJECT with explanation of what headroom is available.
+6. FEASIBILITY
+   If no online node can physically host the VM (all above 90%):
+   → REJECT with explanation of current headroom across all nodes.
 
-RESPONSE FORMAT — follow exactly, no preamble, no extra lines:
+7. DIRECTION CHECK for scale actions
+   scale_down_vm must propose FEWER cores/less RAM than current. Reject if inputs are higher.
+   scale_up_deployment must propose MORE replicas than current. Reject if lower.
+
+RESPONSE FORMAT — no preamble, start immediately with VERDICT:
 VERDICT: APPROVE or REJECT
 RISK: low or medium or high
-REASON: one sentence
+REASON: one clear sentence
 ALTERNATIVE: (only if REJECT) the safer action to take instead
 """
 
@@ -144,10 +164,10 @@ def run_planner(question: str) -> dict:
     answer = response.content
 
     proposed_action = None
-    match = re.search(r'```json\n(.*?)\n```', answer, re.DOTALL)
-    if match:
+    matches = re.findall(r'```json\s*(.*?)\s*```', answer, re.DOTALL)
+    if matches:
         try:
-            proposed_action = json.loads(match.group(1))
+            proposed_action = json.loads(matches[-1])  # always take the last block
         except json.JSONDecodeError:
             pass
 
