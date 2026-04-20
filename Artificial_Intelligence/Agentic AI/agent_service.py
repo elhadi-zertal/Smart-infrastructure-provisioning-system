@@ -250,10 +250,28 @@ async def _check_outcome(tool: str, inputs: dict, action_id: str):
 
 
 
+RISK_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+def _effective_risk(tool: str, proposed_action: dict, critique: dict) -> str:
+    """Return the highest risk level across the static table, planner claim, and critic assessment.
+
+    The static RISK_LEVELS table is the authoritative floor — a hallucinating
+    Critic or Planner can only raise the risk, never lower it below what the
+    table mandates for a given tool.
+    """
+    static_risk  = get_risk_level(tool)
+    planner_risk = proposed_action.get("risk", static_risk).lower().strip()
+    critic_risk  = critique.get("risk", planner_risk).lower().strip()
+    return max(
+        [static_risk, planner_risk, critic_risk],
+        key=lambda r: RISK_ORDER.get(r, 2)  # unknown strings treated as high
+    )
+
+
 async def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict):
     tool      = proposed_action.get("tool")
     inputs    = proposed_action.get("inputs", {})
-    risk      = critique.get("risk", "high")
+    risk      = _effective_risk(tool, proposed_action, critique)
     reason    = proposed_action.get("reason", "No reason provided")
     action_id = str(uuid.uuid4())[:8]
 
@@ -402,7 +420,7 @@ async def ask(query: Query):
             }
         }
 
-    risk      = critique.get("risk", "high")
+    risk      = _effective_risk(proposed_action["tool"], proposed_action, critique)
     action_id = str(uuid.uuid4())[:8]
 
     if risk in ("low", "medium"):
