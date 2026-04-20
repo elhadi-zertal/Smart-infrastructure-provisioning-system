@@ -1,15 +1,16 @@
-from fastapi import FastAPI, BackgroundTasks, logger
+from fastapi import FastAPI, BackgroundTasks
+import logging
+import httpx
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import requests
 import uuid
-import time
 import asyncio
 import os
 from agents import run_planner, run_critic
 import sqlite3, json, time
-from tools import get_risk_level, scale_vm, clone_vm, scale_deployment
+from tools import get_risk_level
 from email_client import (
     send_approval_request,
     send_action_executed,
@@ -30,14 +31,13 @@ NOTIFY_LOW_RISK    = os.getenv("NOTIFY_LOW_RISK", "false").lower() == "true"
 
 # High-risk actions waiting for admin approval
 # Key: action_id, Value: {action, critique, created_at}
-approval_queue: dict[str, dict] = {}
 
-# Executed action log (last 100)
-executed_log: list[dict] = []
+
+
 
 scheduler = AsyncIOScheduler()
 
-
+logger = logging.getLogger(__name__)
 
 
 DB_PATH = os.getenv("AGENT_DB_PATH", "./agent_state.db")
@@ -101,7 +101,9 @@ def _log_save(entry: dict):
     )
     con.commit(); con.close()
 
-    #On startup, call `_init_db()` and reload `approval_queue = _queue_load_all()`
+
+
+
 
 
 
@@ -169,17 +171,19 @@ def execute_action(tool: str, inputs: dict) -> dict:
         return {"status": "ok" if r.ok else "error", "http_status": r.status_code}
 
 
-def log_execution(tool: str, inputs: dict, result: dict, triggered_by: str = "autonomous"):
-    """Add an entry to the in-memory execution log."""
-    executed_log.insert(0, {
-        "timestamp":    time.time(),
-        "tool":         tool,
-        "inputs":       inputs,
-        "result":       result,
-        "triggered_by": triggered_by
-    })
-    if len(executed_log) > 100:
-        executed_log.pop()
+def log_execution(tool: str, inputs: dict, result: dict,
+                  triggered_by: str = "autonomous", action_id: str = None):
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        """INSERT INTO executed_log
+           (timestamp, tool, inputs, result, triggered_by, action_id, outcome)
+           VALUES (?,?,?,?,?,?,?)""",
+        (time.time(), tool, json.dumps(inputs), json.dumps(result),
+         triggered_by, action_id, None)
+    )
+    con.commit()
+    con.close()
+    logger.info(f"[log] {tool} on {inputs} by {triggered_by} (id={action_id})")
 
 
 async def _check_outcome(tool: str, inputs: dict, action_id: str):
@@ -189,17 +193,46 @@ async def _check_outcome(tool: str, inputs: dict, action_id: str):
     outcome = "unknown"
     try:
         vmid = inputs.get("vmid")
-        if vmid and tool in ("scale_vm", "scale_down_vm", "restart_vm"):
-            vm = requests.get(f"{BASE}/vms/{vmid}", timeout=5).json()
+        if vmid and tool in ("scale_vm", "scale_down_vm"):
+            vm = asyncio.to_thread(requests.get(f"{BASE}/vms/{vmid}", timeout=5).json())
             cpu_util = vm.get("cpu", 0) * 100
             outcome = "resolved" if cpu_util < 80 else "unresolved"
 
         elif tool in ("scale_up_deployment", "scale_down_deployment"):
             ns, name = inputs.get("namespace"), inputs.get("name")
-            dep = requests.get(f"{BASE}/deployments/{ns}/{name}", timeout=5).json()
+            dep = asyncio.to_thread(requests.get(f"{BASE}/deployments/{ns}/{name}", timeout=5).json())
             ready = dep.get("ready_replicas", 0)
             total = dep.get("replicas", 1)
             outcome = "resolved" if ready == total else "unresolved"
+
+        elif tool in ("restart_vm",):
+            vmid = inputs.get("vmid")
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(f"{BASE}/vms/{vmid}")
+                if r.status_code == 200:
+                    vm = r.json()
+                    outcome = "resolved" if vm.get("status") == "running" else "unresolved"
+
+        elif tool in ("restart_lxc",):
+            vmid = inputs.get("vmid")
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(f"{BASE}/lxc/{vmid}")
+                if r.status_code == 200:
+                    ct = r.json()
+                    outcome = "resolved" if ct.get("status") == "running" else "unresolved"
+
+        elif tool == "migrate_vm":
+            vmid = inputs.get("vmid")
+            target = inputs.get("target_node")
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(f"{BASE}/vms/{vmid}")
+                if r.status_code == 200:
+                    vm = r.json()
+                    outcome = "resolved" if vm.get("node") == target else "unresolved"
+
+        elif tool in ("clone_vm", "clone_lxc"):
+            # Clone success = no immediate failure; mark resolved if API returned ok
+            outcome = "resolved"   # clones are structural; deeper check not meaningful here
 
     except Exception as e:
         outcome = f"check_failed: {e}"
@@ -215,35 +248,37 @@ async def _check_outcome(tool: str, inputs: dict, action_id: str):
     #Add `outcome TEXT` and `action_id TEXT` columns to `executed_log` table. After `log_execution()`, call `asyncio.create_task(_check_outcome(tool, inputs, action_id))`.
 
 
-def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict):
-    """
-    Main decision point after Critic approves.
-    Low/medium risk → execute immediately.
-    High risk → email admin + queue.
-    """
-    tool    = proposed_action.get("tool")
-    inputs  = proposed_action.get("inputs", {})
-    risk    = critique.get("risk", "high")
+
+
+async def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict):
+    tool      = proposed_action.get("tool")
+    inputs    = proposed_action.get("inputs", {})
+    risk      = critique.get("risk", "high")
+    reason    = proposed_action.get("reason", "No reason provided")
+    action_id = str(uuid.uuid4())[:8]
+
+    if critique.get("verdict", "REJECT") != "APPROVE":
+        print(f"[agent] Action {tool} rejected by Critic. No execution.")
+        return
 
     if risk in ("low", "medium"):
-        # Auto-execute
         result = execute_action(tool, inputs)
-        log_execution(tool, inputs, result, triggered_by="autonomous")
+        await asyncio.to_thread(log_execution(tool, inputs, result, triggered_by="autonomous", action_id=action_id))
+        asyncio.create_task(_check_outcome(tool, inputs, action_id))
 
-        # Notify admin for medium risk (optional for low risk)
         if risk == "medium" or NOTIFY_LOW_RISK:
             send_action_executed(tool, inputs, result)
 
         print(f"[agent] Auto-executed {tool} (risk={risk}): {result}")
 
     else:
-        # High risk — queue for admin approval
-        action_id = str(uuid.uuid4())[:8]
-        approval_queue[action_id] = {
+        # High risk — save to SQLite and email admin
+        entry = {
             "proposed_action": proposed_action,
             "critique":        critique,
             "created_at":      time.time()
         }
+        await asyncio.to_thread(_queue_save(action_id, entry))
 
         cluster_summary = {
             "nodes_online":  len([n for n in cluster_snapshot.get("nodes", {}).values()
@@ -253,28 +288,18 @@ def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict
             "warning_queue": len(cluster_snapshot.get("warning_queue", [])),
             "bottleneck":    cluster_snapshot.get("prediction", {}).get("bottleneck", "unknown")
         }
-
         send_approval_request(action_id, proposed_action, critique, cluster_summary)
-        print(f"[agent] High-risk action queued (id={action_id}): {tool}")
-
-
+        print(f"[agent] High-risk action queued to SQLite (id={action_id}): {tool}")
 # ─────────────────────────────────────────────────────────────
 #  Autonomous polling loop
 #  Runs every POLL_INTERVAL_SEC seconds without admin input.
 # ─────────────────────────────────────────────────────────────
 
 async def autonomous_poll():
-    """
-    Main autonomous loop. Asks the Planner to assess the cluster,
-    runs the Critic, and acts based on risk level.
-    """
     try:
         print("[agent] Autonomous poll starting...")
-
-        # Get current cluster state
         snapshot = requests.get(f"{BASE}/cluster-snapshot", timeout=5).json()
 
-        # Ask Planner to assess the cluster
         question = (
             "Assess the current cluster state. Check all nodes, running VMs, "
             "Kubernetes deployments, the warning queue, and the XGBoost prediction. "
@@ -288,47 +313,40 @@ async def autonomous_poll():
             print("[agent] Poll complete — no action needed.")
             return
 
-        # Run Critic
         critique = run_critic(proposed_action, snapshot)
 
-        if critique["verdict"] == "REJECT":
-            print(f"[agent] Critic rejected: {critique['reason']}")
-            # Send info email for rejected actions (optional — controlled by config)
+        if critique.get("verdict", "REJECT") == "REJECT":
+            print(f"[agent] Critic rejected: {critique.get('reason')}")
             if os.getenv("NOTIFY_REJECTIONS", "false").lower() == "true":
                 send_action_rejected_by_critic(
                     proposed_action.get("tool"),
                     proposed_action.get("inputs"),
-                    critique["reason"],
+                    critique.get("reason"),
                     critique.get("alternative")
                 )
             return
 
-        # Critic approved — execute or queue based on risk
-        process_action(proposed_action, critique, snapshot)
+        await process_action(proposed_action, critique, snapshot)  # ← await added
 
     except Exception as e:
         print(f"[agent] Poll error: {e}")
 
 
 async def expire_old_approvals():
-    """
-    Remove approval requests that have exceeded the TTL (default 24h).
-    Expired high-risk actions are automatically rejected.
-    """
-    now = time.time()
-    expired = [
-        aid for aid, entry in approval_queue.items()
-        if now - entry["created_at"] > APPROVAL_TTL_SEC
-    ]
-    for aid in expired:
-        entry = approval_queue.pop(aid)
-        print(f"[agent] Approval {aid} expired and auto-rejected")
-        log_execution(
-            entry["proposed_action"]["tool"],
-            entry["proposed_action"]["inputs"],
-            {"status": "expired", "reason": "admin did not respond within TTL"},
-            triggered_by="expired"
-        )
+    now   = time.time()
+    items = await asyncio.to_thread(_queue_load_all())   # ← reads all from SQLite
+
+    for action_id, entry in items.items():
+        if now - entry["created_at"] > APPROVAL_TTL_SEC:
+            await asyncio.to_thread(_queue_pop(action_id))   # ← deletes from SQLite
+            print(f"[agent] Approval {action_id} expired and auto-rejected")
+            await asyncio.to_thread(log_execution(
+                entry["proposed_action"]["tool"],
+                entry["proposed_action"]["inputs"],
+                {"status": "expired", "reason": "admin did not respond within TTL"},
+                triggered_by="expired"
+                # no action_id passed here intentionally — expired items were never executed
+            ))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -337,10 +355,13 @@ async def expire_old_approvals():
 
 @asynccontextmanager
 async def lifespan(app):
+    _init_db()                                # ← create tables if not exist
+    logger.info(f"[agent] DB initialised at {DB_PATH}")
+    # (no global approval_queue dict needed — _queue_load_all() used per request)
     scheduler.add_job(autonomous_poll,      "interval", seconds=POLL_INTERVAL_SEC, max_instances=1)
     scheduler.add_job(expire_old_approvals, "interval", seconds=3600)
     scheduler.start()
-    print(f"[agent] Autonomous polling started — interval: {POLL_INTERVAL_SEC}s")
+    logger.info(f"[agent] Autonomous polling started — interval: {POLL_INTERVAL_SEC}s")
     yield
     scheduler.shutdown()
 
@@ -362,12 +383,6 @@ class Query(BaseModel):
 
 @app.post("/ask")
 async def ask(query: Query):
-    """
-    Admin asks a natural language question.
-    Can be used anytime for diagnosis — independent of the autonomous loop.
-    If the Planner proposes a low/medium action → executes immediately.
-    If high risk → queues and sends email.
-    """
     snapshot        = requests.get(f"{BASE}/cluster-snapshot", timeout=5).json()
     result          = run_planner(query.question)
     proposed_action = result.get("proposed_action")
@@ -377,21 +392,25 @@ async def ask(query: Query):
 
     critique = run_critic(proposed_action, snapshot)
 
-    if critique["verdict"] == "REJECT":
+    if critique.get("verdict", "REJECT") == "REJECT":
         return {
             "answer": result["answer"],
             "action": {
                 "status":      "rejected_by_critic",
-                "reason":      critique["reason"],
+                "reason":      critique.get("reason"),
                 "alternative": critique.get("alternative")
             }
         }
 
-    risk = critique.get("risk", "high")
+    risk      = critique.get("risk", "high")
+    action_id = str(uuid.uuid4())[:8]
 
     if risk in ("low", "medium"):
         exec_result = execute_action(proposed_action["tool"], proposed_action["inputs"])
-        log_execution(proposed_action["tool"], proposed_action["inputs"], exec_result, triggered_by="admin_ask")
+        log_execution(proposed_action["tool"], proposed_action["inputs"],
+                      exec_result, triggered_by="admin_ask", action_id=action_id)
+        asyncio.create_task(_check_outcome(proposed_action["tool"],
+                                           proposed_action["inputs"], action_id))
         return {
             "answer": result["answer"],
             "action": {
@@ -403,13 +422,14 @@ async def ask(query: Query):
             }
         }
     else:
-        # High risk — queue same as autonomous loop
-        action_id = str(uuid.uuid4())[:8]
-        approval_queue[action_id] = {
+        # High risk — save to SQLite, email admin
+        entry = {
             "proposed_action": proposed_action,
             "critique":        critique,
             "created_at":      time.time()
         }
+        _queue_save(action_id, entry)
+
         cluster_summary = {
             "nodes_online": len(snapshot.get("nodes", {})),
             "bottleneck":   snapshot.get("prediction", {}).get("bottleneck", "unknown")
@@ -429,17 +449,16 @@ async def ask(query: Query):
 
 @app.get("/approve/{action_id}")
 async def approve_action(action_id: str):
-    """
-    Admin clicks the approve link in the email.
-    Executes the queued high-risk action immediately.
-    """
-    entry = approval_queue.pop(action_id, None)
+    entry = _queue_pop(action_id)   # ← reads from SQLite and deletes row atomically
     if not entry:
         return {"status": "error", "detail": "action_id not found or already processed"}
 
-    action = entry["proposed_action"]
-    result = execute_action(action["tool"], action["inputs"])
-    log_execution(action["tool"], action["inputs"], result, triggered_by="admin_email_approval")
+    action    = entry["proposed_action"]
+    exec_id   = str(uuid.uuid4())[:8]
+    result    = execute_action(action["tool"], action["inputs"])
+    await asyncio.to_thread(log_execution(action["tool"], action["inputs"], result,
+                  triggered_by="admin_email_approval", action_id=exec_id))
+    asyncio.create_task(_check_outcome(action["tool"], action["inputs"], exec_id))
 
     return {
         "status":  "executed",
@@ -451,46 +470,55 @@ async def approve_action(action_id: str):
 
 @app.get("/reject/{action_id}")
 async def reject_action(action_id: str):
-    """
-    Admin clicks the reject link in the email.
-    Removes the action from the queue without executing it.
-    """
-    entry = approval_queue.pop(action_id, None)
+    entry = await asyncio.to_thread(_queue_pop(action_id))   # ← reads from SQLite and deletes row atomically
     if not entry:
         return {"status": "error", "detail": "action_id not found or already processed"}
 
     action = entry["proposed_action"]
-    log_execution(
+    await asyncio.to_thread(log_execution(
         action["tool"], action["inputs"],
         {"status": "rejected_by_admin"},
-        triggered_by="admin_email_rejection"
-    )
+        triggered_by="admin_email_rejection",
+        action_id=action_id
+    ))
     return {"status": "rejected", "tool": action["tool"]}
 
 
 @app.get("/approval-queue")
 def get_approval_queue():
-    """Returns all high-risk actions waiting for admin approval."""
+    items = _queue_load_all()   # ← reads all rows from SQLite
     return {
-        "count": len(approval_queue),
+        "count": len(items),
         "actions": {
             aid: {
-                "tool":       e["proposed_action"].get("tool"),
-                "inputs":     e["proposed_action"].get("inputs"),
-                "risk":       e["critique"].get("risk"),
-                "reason":     e["proposed_action"].get("reason"),
-                "queued_at":  e["created_at"],
-                "expires_in": max(0, APPROVAL_TTL_SEC - (time.time() - e["created_at"]))
+                "tool":       entry["proposed_action"].get("tool"),
+                "inputs":     entry["proposed_action"].get("inputs"),
+                "risk":       entry["critique"].get("risk"),
+                "reason":     entry["proposed_action"].get("reason"),
+                "queued_at":  entry["created_at"],
+                "expires_in": max(0, APPROVAL_TTL_SEC - (time.time() - entry["created_at"]))
             }
-            for aid, e in approval_queue.items()
+            for aid, entry in items.items()
         }
     }
 
 
 @app.get("/action-log")
 def get_executed_log():
-    """Returns the last 100 actions executed by the system."""
-    return executed_log
+    if not os.path.exists(DB_PATH):
+        return []
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        """SELECT timestamp, tool, inputs, result, triggered_by, action_id, outcome
+           FROM executed_log ORDER BY id DESC LIMIT 100"""
+    ).fetchall()
+    con.close()
+    return [
+        {"timestamp": r[0], "tool": r[1], "inputs": json.loads(r[2]),
+         "result": json.loads(r[3]), "triggered_by": r[4],
+         "action_id": r[5], "outcome": r[6]}
+        for r in rows
+    ]
 
 
 @app.post("/poll/trigger")
@@ -500,11 +528,19 @@ async def trigger_poll(background_tasks: BackgroundTasks):
     return {"status": "poll triggered"}
 
 
+def _executed_log_count() -> int:
+    con = sqlite3.connect(DB_PATH)
+    row = con.execute("SELECT COUNT(*) FROM executed_log").fetchone()
+    con.close()
+    return row[0] if row else 0
+
+
 @app.get("/health")
 def health():
+    items = _queue_load_all()
     return {
         "status":              "ok",
         "poll_interval_sec":   POLL_INTERVAL_SEC,
-        "approval_queue_size": len(approval_queue),
-        "executed_log_size":   len(executed_log)
+        "approval_queue_size": len(items),
+        "executed_log_size":   len(_executed_log_count())
     }

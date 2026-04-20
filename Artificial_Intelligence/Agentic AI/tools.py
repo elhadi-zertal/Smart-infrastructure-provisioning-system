@@ -57,7 +57,7 @@ def get_xgboost_prediction():
     return requests.get(f"{BASE}/prediction").json()
 
 def get_action_log():
-    """Returns the last 50 automated actions taken by the system. Always check this before proposing an action to avoid duplicates."""
+    """Returns the last 100 automated actions taken by the system. Always check this before proposing an action to avoid duplicates."""
     return requests.get(f"{AGENT_BASE}/action-log").json()
 
 def list_lxc():
@@ -68,34 +68,33 @@ def get_lxc(vmid: int):
     """Returns detailed stats for a single LXC container: node placement, CPU, RAM, disk, current utilisation."""
     return requests.get(f"{BASE}/lxc/{vmid}").json()
 
+
 def get_vm_action_history(vmid: int, limit: int = 20):
-    """Returns the history of all automated actions taken on a specific VM, including outcomes.
-    Always call this before proposing a repeated action on the same VM.
-    If the same action was tried multiple times without 'resolved' outcome, escalate to a different approach."""
+    if not os.path.exists(AGENT_DB_PATH):
+        return []
     con = sqlite3.connect(AGENT_DB_PATH)
-    rows = con.execute(
-        """SELECT timestamp, tool, inputs, result, outcome, triggered_by
-           FROM executed_log
-           WHERE json_extract(inputs, '$.vmid') = ?
-           ORDER BY timestamp DESC LIMIT ?""",
-        (vmid, limit)
-    ).fetchall()
-    con.close()
+    try:
+        rows = con.execute(
+            """SELECT timestamp, tool, inputs, result, outcome, triggered_by
+               FROM executed_log
+               WHERE json_extract(inputs, '$.vmid') = ?
+               ORDER BY timestamp DESC LIMIT ?""",
+            (vmid, limit)
+        ).fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    finally:
+        con.close()
     return [
-        {
-            "timestamp":    r[0],
-            "tool":         r[1],
-            "inputs":       json.loads(r[2]),
-            "result":       json.loads(r[3]),
-            "outcome":      r[4],
-            "triggered_by": r[5],
-        }
+        {"timestamp": r[0], "tool": r[1], "inputs": json.loads(r[2]),
+         "result": json.loads(r[3]), "outcome": r[4], "triggered_by": r[5]}
         for r in rows
     ]
 
 # ─────────────────────────────────────────────────────────────
 #  WRITE TOOLS — executed autonomously for low/medium risk.
 #  High risk actions go through email approval queue instead.
+#  they are reference definitions for documentation
 # ─────────────────────────────────────────────────────────────
 
 def scale_vm(vmid: int, cores: int = None, memory: int = None):
@@ -138,7 +137,7 @@ def scale_down_deployment(namespace: str, name: str, replicas: int):
 def stop_vm(vmid: int):
     """Gracefully shut down a running VM. HIGH RISK — irreversible without manual restart.
     Only propose when the VM is confirmed problematic and admin approval is expected."""
-    return requests.post(f"{BASE}/vms/{vmid}/stop", timeout=30).json()
+    return {"status": "queued", "tool": "stop_vm", "vmid": vmid}
 
 def restart_vm(vmid: int):
     """Reboot a VM. Causes a brief service interruption. Medium risk.
@@ -147,7 +146,7 @@ def restart_vm(vmid: int):
 
 def stop_lxc(vmid: int):
     """Gracefully stop a running LXC container. HIGH RISK."""
-    return requests.post(f"{BASE}/lxc/{vmid}/stop", timeout=30).json()
+    return {"status": "queued", "tool": "stop_lxc", "vmid": vmid}
 
 def restart_lxc(vmid: int):
     """Reboot an LXC container. Medium risk. Causes brief service interruption."""

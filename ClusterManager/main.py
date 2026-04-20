@@ -537,7 +537,6 @@ def _collect_ml_snapshot(vm: dict, instance_id: str) -> None:
     # Proxmox reports cpu as a ratio 0-1, mem/maxmem in bytes
     cpu_pct = float(vm.get("cpu",    0.0)) * 100.0
     max_mem = float(vm.get("maxmem", 1))
-    max_mem = float(vm.get("maxmem", 1))
     mem_used = float(vm.get("mem", 0))
     ram_pct = (mem_used / max(max_mem, 1)) * 100.0  # usage, not free
 
@@ -2009,6 +2008,10 @@ def remove_from_warning_queue(
 # ── Manual scaling ────────────────────────────────────────────────────────────
 @app.put("/vms/{vmid}/resources")
 def update_vm_resources(vmid: int, resources: VMResources):
+    current = cluster_state["vms"].get(vmid, {})
+    if resources.cores is not None and resources.cores < 1:
+        raise HTTPException(400, "cores must be >= 1")
+    # Direction check can be done here if the endpoint knows intent
     proxmox_scale_vertically(vmid, TargetType.VM, resources)
     return {"status": "ok", "vmid": vmid}
 
@@ -2114,10 +2117,13 @@ def delete_lxc(vmid: int):
         raise HTTPException(500, str(e))
     
 
+class MigrateRequest(BaseModel):
+    target_node: str
+
 @app.post("/vms/{vmid}/migrate")
-def migrate_vm(vmid: int, payload: dict):
-    """Live-migrate a VM to a different node for load balancing."""
-    target_node = payload.get("target_node")
+def migrate_vm(vmid: int, payload: MigrateRequest):
+    target_node = payload.target_node
+    ...
     if not target_node:
         raise HTTPException(400, "target_node is required")
     vm = cluster_state["vms"].get(vmid)

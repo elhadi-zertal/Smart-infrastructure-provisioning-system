@@ -1,10 +1,11 @@
 from agno.agent import Agent, RunResponse
 from agno.models.groq import Groq
-from tools import ALL_TOOLS, READ_TOOLS
+from tools import READ_TOOLS, get_risk_level  # already imported in agent_service.py, add here too HIGH_RISK_TOOLS
 import json
 import os
 import re
 from agno.db.sqlite import SqliteDb
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ HIGH risk actions: still output the JSON. The system handles escalation automati
 
 planner = Agent(
     model=Groq(
-        id="llama-3.1-8b-instant",
+        id="llama-3.3-70b-versatile",
         api_key=os.environ['GROQ_API_KEY']
     ),
     tools=READ_TOOLS,
@@ -81,8 +82,7 @@ planner = Agent(
     add_history_to_messages=True,    # include last N turns in context
     num_history_responses=10,        # how many past responses to inject
     show_tool_calls=True,
-    markdown=True,
-    show_tool_calls=True
+    markdown=True
 )
 
 
@@ -139,7 +139,7 @@ ALTERNATIVE: (only if REJECT) the safer action to take instead
 
 critic = Agent(
     model=Groq(
-        id="llama-3.1-8b-instant",
+        id="llama-3.3-70b-versatile",
         api_key=os.environ['GROQ_API_KEY']
     ),
     instructions=CRITIC_INSTRUCTIONS,
@@ -177,6 +177,7 @@ def run_planner(question: str) -> dict:
     }
 
 
+
 def run_critic(proposed_action: dict, cluster_snapshot: dict) -> dict:
     """
     Run the Critic agent.
@@ -202,18 +203,27 @@ Current cluster state:
     for line in text.splitlines():
         if ":" in line:
             key, val = line.split(":", 1)
-            lines[key.strip()] = val.strip()
+            lines[key.strip().upper()] = val.strip()   # BUG-08 fix: .strip() on both sides
 
-    # Critic may escalate risk but never de-escalate
-    planner_risk = proposed_action.get("risk", "high")
-    critic_risk  = lines.get("RISK", planner_risk).lower()
-    risk_order   = {"low": 0, "medium": 1, "high": 2}
-    final_risk   = critic_risk if risk_order.get(critic_risk, 2) >= risk_order.get(planner_risk, 0) \
-                   else planner_risk
+    risk_order = {"low": 0, "medium": 1, "high": 2}
+
+    # --- BUG-04 FIX: static table is the authoritative floor ---
+    tool_name   = proposed_action.get("tool", "")
+    static_risk = get_risk_level(tool_name)           # from RISK_LEVELS table in tools.py
+
+    planner_risk = proposed_action.get("risk", static_risk).lower().strip()
+    critic_risk  = lines.get("RISK", planner_risk).lower().strip()
+
+    # Final risk = max(static floor, planner claim, critic assessment)
+    # The critic can escalate but nothing can go below the static table.
+    final_risk = max(
+        [static_risk, planner_risk, critic_risk],
+        key=lambda r: risk_order.get(r, 2)
+    )
 
     return {
-        "verdict":     lines.get("VERDICT", "REJECT"),
+        "verdict":     lines.get("VERDICT", "REJECT").strip(),
         "risk":        final_risk,
         "reason":      lines.get("REASON",  "Could not parse critic response"),
-        "alternative": lines.get("ALTERNATIVE")
+        "alternative": lines.get("ALTERNATIVE"),
     }
