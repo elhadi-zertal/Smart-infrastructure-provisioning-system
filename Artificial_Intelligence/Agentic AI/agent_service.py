@@ -111,49 +111,49 @@ def _log_save(entry: dict):
 #  Core execution logic
 # ─────────────────────────────────────────────────────────────
 
-def execute_action(tool: str, inputs: dict) -> dict:
+async def execute_action(tool: str, inputs: dict, client: httpx.AsyncClient) -> dict:
     """Execute a write action against the Alert Manager API."""
     if tool == "scale_vm" or tool == "scale_down_vm":
         body = {k: v for k, v in inputs.items() if k not in ("vmid",) and v is not None}
-        r = requests.put(f"{BASE}/vms/{inputs['vmid']}/resources", json=body, timeout=10)
+        r = await client.put(f"{BASE}/vms/{inputs['vmid']}/resources", json=body, timeout=10)
 
     elif tool == "clone_vm":
-        r = requests.post(f"{BASE}/vms/{inputs['vmid']}/clone", timeout=30)
+        r = await client.post(f"{BASE}/vms/{inputs['vmid']}/clone", timeout=30)
 
     elif tool == "clone_lxc":
-        r = requests.post(f"{BASE}/lxc/{inputs['vmid']}/clone", timeout=30)
+        r = await client.post(f"{BASE}/lxc/{inputs['vmid']}/clone", timeout=30)
 
     elif tool in ("scale_up_deployment", "scale_down_deployment"):
-        r = requests.patch(
+        r = await client.patch(
             f"{BASE}/deployments/{inputs['namespace']}/{inputs['name']}/replicas",
             params={"replicas": inputs["replicas"]}, timeout=10
         )
 
     elif tool == "stop_vm":
-        r = requests.post(f"{BASE}/vms/{inputs['vmid']}/stop", timeout=30)
+        r = await client.post(f"{BASE}/vms/{inputs['vmid']}/stop", timeout=30)
 
     elif tool == "restart_vm":
-        r = requests.post(f"{BASE}/vms/{inputs['vmid']}/restart", timeout=30)
+        r = await client.post(f"{BASE}/vms/{inputs['vmid']}/restart", timeout=30)
 
     elif tool == "stop_lxc":
-        r = requests.post(f"{BASE}/lxc/{inputs['vmid']}/stop", timeout=30)
+        r = await client.post(f"{BASE}/lxc/{inputs['vmid']}/stop", timeout=30)
 
     elif tool == "restart_lxc":
-        r = requests.post(f"{BASE}/lxc/{inputs['vmid']}/restart", timeout=30)
+        r = await client.post(f"{BASE}/lxc/{inputs['vmid']}/restart", timeout=30)
 
     elif tool == "delete_vm":
-        r = requests.delete(f"{BASE}/vms/{inputs['vmid']}", timeout=30)
+        r = await client.delete(f"{BASE}/vms/{inputs['vmid']}", timeout=30)
 
     elif tool == "delete_lxc":
-        r = requests.delete(f"{BASE}/lxc/{inputs['vmid']}", timeout=30)
+        r = await client.delete(f"{BASE}/lxc/{inputs['vmid']}", timeout=30)
 
     elif tool == "delete_deployment":
-        r = requests.delete(
+        r = await client.delete(
             f"{BASE}/deployments/{inputs['namespace']}/{inputs['name']}", timeout=30
         )
 
     elif tool == "migrate_vm":
-        r = requests.post(
+        r = await  client.post(
             f"{BASE}/vms/{inputs['vmid']}/migrate",
             json={"target_node": inputs["target_node"]}, timeout=60
         )
@@ -250,28 +250,10 @@ async def _check_outcome(tool: str, inputs: dict, action_id: str):
 
 
 
-RISK_ORDER = {"low": 0, "medium": 1, "high": 2}
-
-def _effective_risk(tool: str, proposed_action: dict, critique: dict) -> str:
-    """Return the highest risk level across the static table, planner claim, and critic assessment.
-
-    The static RISK_LEVELS table is the authoritative floor — a hallucinating
-    Critic or Planner can only raise the risk, never lower it below what the
-    table mandates for a given tool.
-    """
-    static_risk  = get_risk_level(tool)
-    planner_risk = proposed_action.get("risk", static_risk).lower().strip()
-    critic_risk  = critique.get("risk", planner_risk).lower().strip()
-    return max(
-        [static_risk, planner_risk, critic_risk],
-        key=lambda r: RISK_ORDER.get(r, 2)  # unknown strings treated as high
-    )
-
-
-async def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict):
+async def process_action(proposed_action: dict, critique: dict, cluster_snapshot: dict, client: httpx.AsyncClient):
     tool      = proposed_action.get("tool")
     inputs    = proposed_action.get("inputs", {})
-    risk      = _effective_risk(tool, proposed_action, critique)
+    risk      = critique.get("risk", "high")
     reason    = proposed_action.get("reason", "No reason provided")
     action_id = str(uuid.uuid4())[:8]
 
@@ -280,13 +262,10 @@ async def process_action(proposed_action: dict, critique: dict, cluster_snapshot
         return
 
     if risk in ("low", "medium"):
-        result = execute_action(tool, inputs)
-        await asyncio.to_thread(log_execution(tool, inputs, result, triggered_by="autonomous", action_id=action_id))
-        asyncio.create_task(_check_outcome(tool, inputs, action_id))
-
+        result = await execute_action(tool, inputs, client)
+        log_execution(tool, inputs, result, triggered_by="autonomous")
         if risk == "medium" or NOTIFY_LOW_RISK:
-            send_action_executed(tool, inputs, result)
-
+            await asyncio.to_thread(send_action_executed, tool, inputs, result)
         print(f"[agent] Auto-executed {tool} (risk={risk}): {result}")
 
     else:
@@ -296,8 +275,6 @@ async def process_action(proposed_action: dict, critique: dict, cluster_snapshot
             "critique":        critique,
             "created_at":      time.time()
         }
-        await asyncio.to_thread(_queue_save(action_id, entry))
-
         cluster_summary = {
             "nodes_online":  len([n for n in cluster_snapshot.get("nodes", {}).values()
                                   if n.get("status") == "online"]),
@@ -306,17 +283,20 @@ async def process_action(proposed_action: dict, critique: dict, cluster_snapshot
             "warning_queue": len(cluster_snapshot.get("warning_queue", [])),
             "bottleneck":    cluster_snapshot.get("prediction", {}).get("bottleneck", "unknown")
         }
-        send_approval_request(action_id, proposed_action, critique, cluster_summary)
-        print(f"[agent] High-risk action queued to SQLite (id={action_id}): {tool}")
-# ─────────────────────────────────────────────────────────────
-#  Autonomous polling loop
-#  Runs every POLL_INTERVAL_SEC seconds without admin input.
-# ─────────────────────────────────────────────────────────────
+        await asyncio.to_thread(_queue_save, action_id, entry)
+        sent = await asyncio.to_thread(send_approval_request, action_id, proposed_action, critique, cluster_summary)
+        if not sent:
+            logger.warning(f"[agent] Email failed for high-risk action {action_id} ({tool}) — queued but admin not notified")
+        else:
+            print(f"[agent] High-risk action queued to SQLite (id={action_id}): {tool}")
+        
 
 async def autonomous_poll():
     try:
         print("[agent] Autonomous poll starting...")
-        snapshot = requests.get(f"{BASE}/cluster-snapshot", timeout=5).json()
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(f"{BASE}/cluster-snapshot")
+            snapshot = response.json()
 
         question = (
             "Assess the current cluster state. Check all nodes, running VMs, "
@@ -420,7 +400,7 @@ async def ask(query: Query):
             }
         }
 
-    risk      = _effective_risk(proposed_action["tool"], proposed_action, critique)
+    risk      = critique.get("risk", "high")
     action_id = str(uuid.uuid4())[:8]
 
     if risk in ("low", "medium"):

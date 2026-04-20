@@ -1,5 +1,6 @@
 import smtplib
 import os
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -9,8 +10,8 @@ SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER",     "")   # your email address
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")   # app password
 ADMIN_EMAIL   = os.getenv("ADMIN_EMAIL",   "")   # where to send alerts
-AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://172.25.5.168:8002")
-
+AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:8002")
+logger = logging.getLogger(__name__)
 
 def send_approval_request(action_id: str, proposed_action: dict, critique: dict, cluster_summary: dict):
     """
@@ -78,7 +79,7 @@ If you do not respond within 24 hours, the action will be
 automatically rejected and logged.
 """
 
-    _send(subject, body)
+    return _send(subject, body)
 
 
 def send_action_executed(tool: str, inputs: dict, result: dict):
@@ -100,7 +101,7 @@ by the cluster management system without requiring your approval.
 If this action looks wrong, you can review the action log at:
 {AGENT_BASE_URL}/action-log
 """
-    _send(subject, body)
+    return _send(subject, body)
 
 
 def send_action_rejected_by_critic(tool: str, inputs: dict, reason: str, alternative: str):
@@ -126,7 +127,7 @@ ALTERNATIVE SUGGESTED
 
 The system will continue monitoring and may propose a different action.
 """
-    _send(subject, body)
+    return _send(subject, body)
 
 
 def _send(subject: str, body: str):
