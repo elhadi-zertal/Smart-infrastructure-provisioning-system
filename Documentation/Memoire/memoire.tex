@@ -1,17 +1,35 @@
 \documentclass[a4paper, 12pt]{report}
 
+% --- Core Packages ---
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
-\usepackage{geometry}
-\usepackage{setspace}
+
+% --- Academic Typography & Formatting ---
+\usepackage{mathptmx} % Standard academic Times New Roman font
+\usepackage{microtype} % Prevents margin violations, overfull \hbox, and improves justification
+\usepackage{setspace} % For one-half spacing
+\usepackage[a4paper, left=3.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry} % Left margin larger for binding
+
+% --- Widows and Orphans Protection ---
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+
+% --- Graphics & Tables ---
 \usepackage{graphicx}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{longtable}
-\usepackage{hyperref}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, margin=1cm} % Academic caption styling
+
+% --- Math ---
 \usepackage{amsmath, amssymb}
 
-\geometry{margin=2.5cm}
+% --- Hyperlinks ---
+\usepackage[hidelinks]{hyperref} % Clickable links without ugly colored boxes
+
+% --- Line Spacing ---
 \onehalfspacing
 
 \begin{document}
@@ -47,6 +65,13 @@ High availability features distinguish enterprise virtualization platforms from 
 \subsubsection{Containerization Architecture and Implementation}
 
 Containerization provides an alternative isolation approach that virtualizes at the operating system level rather than the hardware level, enabling fundamentally different performance characteristics and resource efficiency. Containers share the host kernel while maintaining isolated user spaces through kernel features, achieving densities and startup times impossible with traditional virtualization. A single host supporting perhaps a dozen VMs can run hundreds of containers, as containers avoid the overhead of complete operating systems and hypervisor layers.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.9\linewidth, keepaspectratio]{arch_vm_container.gv.png}
+\caption{Architectural comparison between Hardware Virtualization (Virtual Machines) and Operating System Virtualization (Containers).}
+\label{fig:vm_vs_container}
+\end{figure}
 
 Linux containers rely on two primary kernel features for isolation and resource management. Namespaces isolate various system aspects: process ID namespaces ensure containers cannot view or signal processes in other containers, network namespaces provide separate network stacks with independent routing tables and firewall rules, mount namespaces isolate filesystem views, user namespaces map container root users to non-privileged host users for security, inter-process communication namespaces isolate message queues and shared memory, and Unix Time-Sharing (UTS) namespaces allow different hostnames per container. Control groups (cgroups) provide resource limitation and accounting, constraining CPU usage, memory allocation, block I/O bandwidth, and network bandwidth per container, preventing any single container from monopolizing host resources.
 
@@ -125,7 +150,7 @@ Containerized microservices promise solutions through service independence enabl
 \textbf{Problem Statement:}
 
 \emph{What technical, operational, and business factors obligate organizations to transition from traditional monolithic architectures to virtualized and containerized environments with microservices? Under what circumstances do scalability limitations, deployment constraints, and organizational growth necessitate this architectural shift despite substantial increases in system complexity and operational overhead? How do organizations evaluate trade-offs between monolithic simplicity and microservices flexibility to determine appropriate architecture for specific contexts, and what migration strategies minimize transformation risk while delivering incremental business value?}
-\\
+
 % ============================================================
 %  CHAPTER 2 --- CONCEPTION
 % ============================================================
@@ -171,7 +196,7 @@ requirements are in structural tension --- dense placement increases the
 blast radius of individual node failures, while conservative redundancy
 wastes resources --- and the architecture must resolve that tension through
 intelligent scheduling rather than by sacrificing one objective for the
-other \cite{buyya2009cloud}.
+other \cite{yang2025task, alahmad2024multiple}.
  
 The application is structured as a collection of loosely coupled
 microservices, each responsible for a distinct functional capability and
@@ -182,7 +207,7 @@ unit, whereas individual microservices can be replicated or resized
 in response to the specific resource pressures they experience.
 Microservice independence also ensures that a fault in one functional
 component causes graceful degradation rather than total service failure,
-directly supporting the high-availability objective \cite{tanenbaum2017distributed}.
+directly supporting the high-availability objective \cite{senjab2023survey}.
  
 \subsection{Validation Scope}
  
@@ -217,10 +242,24 @@ workloads as containers distributed across the virtual machines.  The
 monitoring layer observes the state of all three operational layers and
 drives the automated responses that maintain the desired operational
 condition of the cluster.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\linewidth, keepaspectratio]{cluster_full.gv.png}
+\caption{The hierarchical 4-layer architecture of the full cluster ecosystem.}
+\label{fig:cluster_full}
+\end{figure}
  
 % -------------------------------------------------------------------
 \subsection{Physical Layer}
 % -------------------------------------------------------------------
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\linewidth, keepaspectratio]{layer1_physical.gv.png}
+\caption{Layer 1: Physical Infrastructure, emphasizing explicit failure domains and redundant networking.}
+\label{fig:layer1_physical}
+\end{figure}
  
 The physical layer is the hardware substrate of the cluster.  It consists
 of a set of physical servers that provide the compute and storage
@@ -246,6 +285,13 @@ cluster or interrupt traffic to hosted services.
 % -------------------------------------------------------------------
 \subsection{Virtual Layer}
 % -------------------------------------------------------------------
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth, keepaspectratio]{layer2_virtual.gv.png}
+\caption{Layer 2: Virtualization, highlighting the WOA-DE Provisioning Algorithm mapping VMs to Physical Servers.}
+\label{fig:layer2_virtual}
+\end{figure}
  
 The virtual layer abstracts the physical server resources into a fleet
 of virtual machines, each representing an isolated execution environment
@@ -279,7 +325,7 @@ machines has a complexity proportional to $n$; by restricting each
 scheduling decision to the $n/k$ physical machines that belong to a
 candidate mini-cluster, the effective scheduling complexity is reduced
 by a factor of $k$, a significant gain at large fleet sizes
-\cite{tanenbaum2017distributed}.  Operationally, mini-clusters group
+\cite{alahmad2024multiple}.  Operationally, mini-clusters group
 virtual machines whose container workloads are strongly related --- that
 is, microservices that communicate frequently or share data --- so that
 the majority of inter-service traffic is confined within a single
@@ -301,7 +347,7 @@ reflecting a known understanding of the service dependency graph.  In
 the \textbf{dynamic} approach, $k$ is inferred and updated continuously
 by a machine learning model that observes inter-service communication
 patterns and resource consumption correlations, adjusting the
-partitioning as the application evolves \cite{meng2020survey}.  The
+partitioning as the application evolves \cite{tuli2023cilp, saxena2022proactive}.  The
 dynamic approach is the long-term target; the static approach provides
 a reliable starting point when historical data is unavailable.
  
@@ -312,12 +358,11 @@ virtual machine with a defined resource request, select the most
 appropriate physical machine within the relevant mini-cluster on which
 to place it.  The algorithm is a purpose-built hybrid that draws
 conceptual inspiration from two established meta-heuristic optimisation
-strategies --- the \textbf{Whale Optimisation Algorithm} (WOA) and
-\textbf{Differential Evolution} (DE) --- without implementing either one
-in its standard form.  Rather than transplanting both algorithms
+strategies --- the \textbf{Whale Optimisation Algorithm} (WOA) \cite{mirjalili2016woa} and
+\textbf{Differential Evolution} (DE) \cite{storn1997de}. The adaptation of such evolutionary models has proven highly effective for optimal VM allocation in cloud environments \cite{zhang2020intelligent}. Rather than transplanting both algorithms
 wholesale, the design selects the mechanisms from each that best suit
 the structural constraints of the VM placement problem, combining them
-into a single coherent procedure.
+into a single coherent procedure. Recent advances have demonstrated the efficacy of Whale Optimization in handling multi-objective VM placement securely \cite{saxena2022secure}.
 
 \paragraph{Conceptual origins.}
 The Whale Optimisation Algorithm \cite{mirjalili2016woa} mimics the
@@ -451,8 +496,8 @@ within the mini-cluster.
 \paragraph{Diagram.}
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth, height=\textheight, keepaspectratio]{flowchart-improved.png}
-\caption{[Figure: flowchart of the hybrid WOA--DE provisioning algorithm to be inserted here.]}
+\includegraphics[width=0.9\linewidth, height=0.8\textheight, keepaspectratio]{flowchart.gv.png}
+\caption{Flowchart of the hybrid WOA--DE provisioning algorithm, highlighting the parallel split and parameter integration loops.}
 \label{fig:flowchart}
 \end{figure}
 
@@ -528,7 +573,7 @@ gigabytes, I/O in megabytes per second, and energy in joules per hour
 high-magnitude dimensions.  Each metric is therefore standardised prior
 to combination using the formula:
  
-$$X_i^* = \frac{X_i - \bar{X}}{\sigma_X}$$
+\[ X_i^* = \frac{X_i - \bar{X}}{\sigma_X} \]
  
 where $\bar{X}$ is the mean and $\sigma_X$ is the standard deviation
 of metric $X$ across all candidate physical machines in the sample.
@@ -537,8 +582,7 @@ the composite score regardless of its original unit or magnitude.
  
 The composite fitness is then computed as a weighted Euclidean distance:
  
-$$\text{fitness} = \sqrt{w_1 \cdot (\Delta C)^2 + w_2 \cdot (\Delta R)^2
-                       + w_3 \cdot (\Delta IO)^2 + w_4 \cdot (\Delta E)^2}$$
+\[ \text{fitness} = \sqrt{w_1 \cdot (\Delta C)^2 + w_2 \cdot (\Delta R)^2 + w_3 \cdot (\Delta IO)^2 + w_4 \cdot (\Delta E)^2} \]
  
 where $\Delta X$ denotes the difference between the resource quantity
 requested by the virtual machine and the quantity currently available on
@@ -572,8 +616,7 @@ for the corresponding service.  Horizontal scaling preserves service
 availability by distributing demand across a larger number of equivalent
 instances rather than by interrupting the existing one.
  
-\textbf{Vertical scaling} responds to resource saturation on an
-individual VM.  CPU utilisation above 80\% (warning) or 95\% (critical)
+\textbf{Vertical scaling} responds to resource saturation on an individual VM.  CPU utilisation above 80\% (warning) or 95\% (critical)
 triggers the addition of one virtual CPU to the instance.  RAM utilisation
 above 60\% (warning) or 80\% (critical) triggers an increase of 20\% of
 the previously allocated memory.  Free disk I/O capacity below 20\%
@@ -586,14 +629,115 @@ by request volume.
 In all scaling scenarios, if the physical machine hosting the virtual
 machine does not possess sufficient free capacity to accommodate the
 additional resources requested by vertical scaling, the virtual machine
-is live-migrated to a more suitable physical machine.  This migration
+is live-migrated to a more suitable physical machine to mitigate performance interference and optimize energy consumption \cite{lai2025energy}.  This migration
 is performed by invoking the provisioning algorithm on the migrating VM,
 which selects the best available physical machine within the
 mini-cluster according to the fitness function described above.
  
 % -------------------------------------------------------------------
+\subsubsection{Virtual Network Architecture}
+% -------------------------------------------------------------------
+
+Abstracting physical compute and storage is insufficient without a
+corresponding abstraction of the physical network. Without it, virtual
+machines placed on different physical servers remain mutually visible
+in ways that undermine isolation. The virtual network layer decouples
+logical topology entirely from physical cabling and switching, allowing
+segment boundaries to be defined and enforced in software on each
+hypervisor node, with no reconfiguration of physical equipment.
+
+\paragraph{Overlay networking.}
+Switch-based segmentation requires every device in the communication
+path to honour segment labels, creating a hard dependency on managed
+hardware. It is also constrained to a limited identifier space,
+insufficient for dense multi-tenant deployments. An overlay network
+removes these constraints by implementing logical segmentation in
+software. Traffic between virtual machines is handled by the
+virtualization layer, allowing segments to span multiple hosts without
+requiring changes to the underlying physical infrastructure. The
+physical network simply forwards standard traffic between hosts, while
+the logical topology is enforced above it.
+
+This approach is particularly suitable in environments where the
+underlying network infrastructure cannot be modified or does not
+support advanced segmentation features. In scenarios where full control
+over physical switching equipment is available, similar isolation could
+be achieved using native mechanisms such as VLAN-based segmentation.
+However, the overlay model provides greater flexibility and portability,
+as it decouples the logical network design from the physical infrastructure.
+
+\paragraph{Three-segment isolation model.}
+The dual-tenant architecture requires network-level isolation, not
+merely application-level access control. A compromised component within
+one tenant's boundary must be unable to reach another tenant's resources
+without traversing a controlled routing point. Three logical segments are
+therefore defined: one for the first tenant's workloads (e.g., VLAN 1),
+one for the second tenant's workloads (e.g., VLAN 2), and one reserved
+exclusively for the observability and monitoring infrastructure. The
+dedicated monitoring segment prevents observability traffic from
+competing with application traffic, and keeps the monitoring stack
+reachable even when a segment is under stress --- precisely when visibility
+is most critical. Figure~\ref{fig:vnet} illustrates the resulting topology.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\linewidth, keepaspectratio]{virtual_network.gv.png}
+\caption{Virtual network topology. Ingress traffic enters through the load balancer and is forwarded to the virtual router, which enforces a default-deny firewall policy and acts as the gateway for the three isolated overlay segments. The monitoring segment is granted controlled read access to other segments and infrastructure components for observability purposes.}
+\label{fig:vnet}
+\end{figure}
+
+\paragraph{Routing and access control.}
+The architecture introduces a central routing component that enforces
+segmentation and access control between logical networks. While
+traditional architectures often rely on physical appliances for
+inter-segment routing, this design utilizes a dedicated virtual router.
+This ensures tight integration with the software-defined overlay,
+providing fine-grained control over traffic flows without requiring
+overlay-aware physical hardware.
+
+Ingress traffic from the external network first passes through a load
+balancer responsible for L4/L7 traffic distribution, which then forwards
+requests to the virtual router acting as the cluster's gateway. By
+holding an interface in every internal segment as well as the external
+network, this gateway becomes the mandatory transit point for all
+ingress, egress, and inter-segment traffic. It enforces a
+\textit{default-deny} posture: unmatched traffic is silently dropped.
+Cross-segment communication requires explicit bidirectional rules,
+ensuring isolation by default. The monitoring segment may initiate
+targeted scrape connections into other segments and infrastructure
+components, but not the reverse, preventing a compromised component
+from disrupting observability. Outbound internet access is provided
+through address translation on the router's upstream interface, keeping
+internal addresses hidden from external networks. A centralised address
+assignment service and integrated name resolution ensure consistent
+connectivity across all segments, decoupling service identity from
+instance placement.
+
+\paragraph{External access and management integration.}
+Administrative and management systems reside outside the logical
+segments and have no inherent route to addresses within the overlay.
+Virtual machines use the virtual router as their default gateway, so
+reply traffic flows correctly without additional configuration.
+Requests originating from management systems must be directed into the
+overlay explicitly. This is achieved by installing static routes on
+management hosts that direct traffic for overlay networks toward the
+router's external interface, bypassing the load balancer which is
+reserved for application ingress. Alternatively, these routes can be
+configured on an upstream router, extending reachability to all devices
+on the management network without per-host configuration. Both
+approaches ensure full, bidirectional connectivity between management
+systems and virtual machines.
+
+% -------------------------------------------------------------------
 \subsection{Containerisation Layer}
 % -------------------------------------------------------------------
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\linewidth, keepaspectratio]{layer3_container.gv.png}
+\caption{Layer 3: Containerisation, detailing the Best-Fit Strategy allocating microservices to minimize host fragmentation.}
+\label{fig:layer3_container}
+\end{figure}
  
 The containerisation layer deploys application services as containers
 distributed across the virtual machine fleet.  Each container runs a
@@ -604,10 +748,10 @@ container to be scheduled, the virtual machine that has the least
 remaining capacity while still being able to satisfy the container's
 resource request is selected.  This strategy minimises resource
 fragmentation across the VM fleet by filling existing virtual machines
-as fully as possible before utilising the spare capacity of less-loaded
+as fully as possible \cite{begam2020timer} before utilising the spare capacity of less-loaded
 ones, thereby reducing the number of virtual machines that must remain
 active to host a given set of containers and lowering the total energy
-and licensing cost of the cluster \cite{buyya2009cloud}.
+and licensing cost of the cluster \cite{yang2025task}.
  
 Containers belonging to microservices within the same mini-cluster are
 preferentially scheduled on virtual machines within that mini-cluster,
@@ -620,6 +764,13 @@ its parent so that the cluster topology remains consistent.
 % -------------------------------------------------------------------
 \subsection{Monitoring Layer}
 % -------------------------------------------------------------------
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth, keepaspectratio]{layer4_monitoring.gv.png}
+\caption{Layer 4: Monitoring and Security, outlining the telemetry ingestion, AI decision routing, and execution constraints.}
+\label{fig:layer4_monitoring}
+\end{figure}
  
 The monitoring layer observes the operational state of all three layers
 beneath it and produces the information and automated responses required
@@ -632,7 +783,7 @@ The monitoring subsystem collects telemetry data continuously from every
 observable entity in the cluster.  Its collection scope spans all four
 categories of observable infrastructure: physical servers, including
 CPU utilisation, memory consumption, disk I/O throughput, and energy
-draw per node; virtual machines, including per-VM CPU steal time,
+draw per node, aligning with modern Data Center Infrastructure Monitoring (DCIM) requirements \cite{balabanov2025dcim}; virtual machines, including per-VM CPU steal time,
 working-set size, and container runtime metrics; physical network devices,
 including switch port utilisation, packet loss counters, and routing
 table state; and virtual network devices, including software-defined
@@ -642,13 +793,12 @@ in the operator's view of cluster state.
  
 Data is collected through a pull-based model in which a central
 aggregator queries agents deployed on each node at configurable
-intervals, following the principle established by Andreolini et al.\
-\cite{andreolini2014closer} that pull-based architectures scale more
-predictably than push-based ones at large fleet sizes.  Collected streams
+intervals, following the principle established by network-adaptive proxy architectures that scale more
+predictably than push-based ones at large fleet sizes \cite{nguyen2022load}.  Collected streams
 are stored with time-windowed retention policies that preserve
 high-resolution data for anomalous intervals and apply progressive
 downsampling to normal intervals, consistent with the selective
-compression approach of Hoke et al.\ \cite{hoke2006intemon}.
+compression approaches seen in robust distributed commodity clusters \cite{bompotas2025commc}.
 Co-located streams --- for example, the CPU and memory utilisation of
 all virtual machines sharing the same physical host --- are stored with
 their correlational relationships preserved, enabling anomaly detection
@@ -677,112 +827,134 @@ contextual data needed for human review.  To prevent alert storms during
 cascading failures, the alert manager applies grouping and inhibition
 rules that consolidate related events into a single actionable signal,
 suppressing downstream symptom alerts when a root-cause alert for the
-same component is already active \cite{beyer2016sre}.
+same component is already active \cite{gu2023towards}.
  
 % ===================================================================
 \section{Artificial Intelligence and Security}
 % ===================================================================
- 
-\subsection{AI-Powered Administrative Assistant}
- 
-The volume of monitoring data and the speed of automated remediation
-events in a large cluster exceed the capacity of a human operator to
-track through dashboards alone.  An AI-powered conversational assistant
-bridges this gap by providing a natural-language interface through which
-the administrator can query the current state of the cluster, investigate
-recent incidents, and request remediation actions without navigating
-low-level management interfaces.
- 
-The assistant has read access to the full telemetry history collected
-by the monitoring subsystem and can answer queries such as the current
-resource utilisation of a specific mini-cluster, the timeline of a
-recent scaling event, or the list of virtual machines that have exceeded
-their CPU thresholds in a given time window.  It can translate
-natural-language questions into structured queries against the monitoring
-data store and present results in a summarised, human-readable form.
- 
-When the administrator requests an action --- such as the live migration
-of a virtual machine, the manual triggering of a horizontal scaling
-event, or the modification of an alert threshold --- the assistant
-presents a clear description of the intended operation and its expected
-consequences and waits for explicit confirmation before issuing the
-corresponding command to the cluster control plane.  No action that
-modifies cluster state is executed autonomously.  This design preserves
-human oversight for all consequential decisions while eliminating the
-need for the administrator to interact with multiple low-level APIs
-directly \cite{meng2020survey}.
- 
-\subsection{VM Sizing and Provisioning Prediction}
- 
-In addition to the reactive scaling mechanisms described in the monitoring
-and service placement section, the architecture incorporates a predictive
-component that anticipates resource needs before saturation is reached.
-This component operates in two modes.
- 
-At \textit{creation time}, the predictive model receives a description
-of the service to be hosted --- its type, expected request volume, and
-historical resource profiles from similar services in the cluster --- and
-produces a recommended initial resource envelope.  This recommendation
-supplements the baseline sizing defined in the VM sizing subsection,
-adapting the initial allocation to the specific workload rather than
-defaulting unconditionally to the standard baseline configuration.
-Accurate initial sizing reduces the frequency of reactive vertical
-scaling events in the early operational lifetime of a virtual machine,
-improving both resource efficiency and service stability \cite{buyya2009cloud}.
- 
-At \textit{runtime}, the predictive model continuously analyses the
-resource consumption trends of active virtual machines.  By applying
-time-series forecasting over the collected metrics, it identifies VMs
-whose utilisation trajectories are approaching the scaling thresholds
-before those thresholds are crossed, and recommends pre-emptive resource
-adjustments.  These recommendations are surfaced through the
-administrative assistant interface, where the administrator reviews and
-confirms them before any resource change is applied.  This closed-loop
-design combines the pattern-recognition capability of a learning model
-with the judgement and accountability of human oversight, avoiding
-both the instability of unconstrained autonomous scaling and the
-latency of purely reactive threshold-based scaling \cite{meng2020survey}.
- 
+
+The management of a large-scale cluster involves operational complexities that exceed the capacity of static rules and manual human oversight. To address this, the architecture introduces a two-tiered Artificial Intelligence (AI) layer: a predictive mathematical component for continuous resource optimisation, and an autonomous cognitive agent system for decision-making and automated remediation.
+
+\subsection{Dynamic Thresholding and Predictive Resource Allocation}
+
+Traditional cluster monitoring relies on static thresholds (e.g., triggering an alert when CPU exceeds 80\%). However, static rules fail to account for the shifting baseline of modern microservices under varying load conditions. To resolve this, the cluster incorporates a predictive learning component that continuously adapts operational parameters.
+
+Rather than waiting for resources to saturate, the system employs continuous regression modelling to predict optimal configurations based on high-frequency telemetry. This predictive component serves two functions:
+\begin{itemize}
+    \item \textbf{Dynamic Alert Thresholds:} It predicts optimal warning and critical thresholds for computational resources (CPU, Memory) and application metrics (error rates). Warning thresholds are dynamically sized to trigger early soft-provisioning, while critical thresholds are tightened or loosened based on the cluster's current stability.
+    \item \textbf{Adaptive Fitness Weights:} The multi-objective provisioning algorithm relies on fitness weights (balancing CPU, RAM, I/O, and energy). The predictive model continuously calculates the current structural bottleneck of the cluster and dynamically adjusts these weights. If the cluster is globally constrained by memory, the algorithm automatically prioritises RAM preservation in subsequent placement decisions.
+\end{itemize}
+
+To prevent catastrophic forgetting and adapt to the evolving nature of the application, the models employ incremental learning. At regular intervals, the models ingest the latest batch of cluster metrics and update their internal representations using their own recent predictions as soft labels. This creates a self-supervised loop that adapts to new baseline behaviours without requiring external ground-truth datasets.
+
+\subsection{Autonomous Decision-Making and Risk-Based Escalation}
+
+While the predictive models configure the cluster's parameters, automated remediation requires contextual reasoning. This is handled by a dual-agent cognitive system that acts as an autonomous operator. The system is designed around a strict segregation of duties between a \textit{Planner} and a \textit{Critic}.
+
+\textbf{The Planner} continuously observes the cluster's state, ingesting telemetry, predictive bottlenecks, and historical logs. When it detects anomalies or resource pressure, it reasons over the data to formulate a remediation strategy. It proposes a specific action (e.g., horizontally scaling a service or vertically resizing a virtual machine) and assigns it an initial risk classification.
+
+\textbf{The Critic} acts as an independent safety validator. It receives the Planner's proposed action and evaluates it against structural constraints. It verifies node headroom to ensure the action will not overload a physical server, checks for duplicate actions in recent logs to prevent runaway execution loops, and ensures the intervention matches the predicted bottleneck. The Critic either approves the action, rejects it with a suggested alternative, or escalates its risk level.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth, keepaspectratio]{ai_security.gv.png}
+\caption{Cognitive dual-agent system highlighting the strict segregation of duties and the risk-based escalation matrix for automated decision-making.}
+\label{fig:ai_security}
+\end{figure}
+
+To balance autonomy with safety, the architecture enforces a strict \textbf{Risk-Based Escalation Matrix}:
+\begin{itemize}
+    \item \textbf{Low and Medium Risk:} Actions that are additive, reversible, or standard (e.g., adding resources, cloning instances for rapid pre-provisioning \cite{sung2024cloning}) are executed immediately by the system once approved by the Critic. The human administrator is bypassed but informed via automated logs.
+    \item \textbf{High Risk:} Actions that are destructive, irreversible, or highly disruptive (e.g., deleting virtual machines, catastrophic scale-downs) trigger a Human-in-the-Loop protocol. The action is placed in an approval queue, and the administrator receives a detailed alert explaining the reasoning, the expected effect, and the rollback strategy. The system waits for explicit human cryptographic approval before proceeding.
+\end{itemize}
+
+% -------------------------------------------------------------------
 \subsection{Security}
- 
-Security in this cluster is treated as a cross-cutting concern that
-applies uniformly across all four layers of the architecture, governed
-by the principle of \textit{defence in depth}: each layer enforces its
-own independent protection mechanisms so that the compromise of any
-single layer does not grant uncontrolled access to the layers beneath it.
- 
-At the physical boundary, hardware firewalls and managed switches
-enforce strict ingress and egress traffic filtering, ensuring that only
-traffic conforming to declared communication policies reaches the
-internal cluster network.  Within the cluster, all inter-VM and
-inter-container communication is subject to network segmentation policies
-that default to deny: a service may only communicate with the specific
-peers for which an explicit authorisation has been declared.  This
-microsegmentation confines the lateral movement available to an attacker
-who has compromised a single container or virtual machine, limiting the
-blast radius of a breach to the reachable neighbourhood of the
-compromised workload \cite{rose2020zero}.
- 
-All entities in the cluster --- physical nodes, virtual machines,
-containers, and user accounts --- are assigned unique, cryptographically
-verifiable identities.  No entity is trusted by virtue of its network
-location alone.  Inter-component communication is mutually authenticated,
-and authorisation decisions follow the principle of least privilege:
-each entity holds only the permissions necessary for its defined function.
-Credentials are short-lived and rotated automatically, limiting the
-exposure window in the event of a credential leak.
- 
-The monitoring subsystem contributes to security by providing the
-observational foundation for behavioural anomaly detection.  Traffic
-patterns, API call frequencies, and resource consumption profiles that
-deviate from established baselines are flagged as potential security
-events and routed to the alert manager, which escalates them to the
-administrator through the same notification pathway used for operational
-incidents.  All security-relevant events --- authentication attempts,
-privilege escalations, policy modifications, and administrative commands
---- are recorded in an immutable audit log that provides the evidentiary
-trail required for post-incident forensics and compliance verification
-\cite{beyer2016sre, rose2020zero}.
+% -------------------------------------------------------------------
+
+Security in this cluster is not a peripheral concern appended after the functional design is complete; it is a structural requirement woven into every layer of the architecture. An adversary capable of manipulating telemetry data could silently disable automated remediation; one capable of issuing forged management commands could destroy production workloads; one capable of compromising the cognitive agents could turn the autonomous decision system into a tool of sabotage. The security design therefore addresses four orthogonal threat surfaces simultaneously: the network perimeter and internal traffic flows, the integrity and confidentiality of all communications, the patch posture and operational hygiene of every component, and the cognitive agent layer itself.
+
+The unifying principle is \textit{defence in depth} \cite{saxena2022secure}: no single protective mechanism is trusted to be sufficient, and the failure of any one control does not expose the cluster to unacceptable risk. Where a control cannot prevent a threat entirely, it is designed to detect it and limit its consequences.
+
+% ·····················································
+\subsubsection{Network Security Architecture}
+% ·····················································
+
+The cluster's network is partitioned into three logically isolated segments corresponding to the three operational domains it serves: the first tenant's workloads, the second tenant's workloads, and the shared monitoring infrastructure. This segmentation is not merely organisational; it is enforced at the packet-routing level so that a compromise of one segment cannot propagate laterally to another without crossing an explicit control boundary.
+
+At the external perimeter, a stateful traffic filter inspects all ingress and egress flows. Inbound traffic is subject to an allowlist: only the ports and protocols required by explicitly provisioned services may enter the cluster. Egress filtering applies an equivalent restriction, preventing a compromised internal component from establishing unauthorised outbound channels, which would otherwise be the first step of a data exfiltration or command-and-control scenario. This bidirectional filtering enforces the principle of least privilege at the network level.
+
+Within the cluster, microsegmentation further constrains lateral movement. Each network segment imposes independent forwarding rules: traffic originating in the monitoring segment may observe the other segments through read-only metric collection but may not issue control commands to them. Traffic between the two tenant segments is prohibited by default; any inter-tenant flow would require an explicit policy exception that must be reviewed and justified. This containment strategy limits the blast radius of any single compromised container or virtual machine: an attacker gaining control of a workload in one segment cannot freely pivot to the others \cite{saxena2022secure}.
+
+A local name-resolution service replaces reliance on external public resolvers. All internal hostnames are resolved within the cluster boundary, eliminating the risk of DNS hijacking through a compromised or malicious public resolver. Because service-to-service communication relies on resolved names, this control also prevents an attacker who has compromised a public DNS record from redirecting internal traffic to an adversary-controlled host.
+
+Availability is protected by an anti-distributed-denial-of-service layer positioned at the perimeter before traffic reaches the internal components. Volumetric and protocol-level attacks are absorbed and filtered at this boundary, ensuring that a sustained flooding attack against a publicly reachable entry point does not saturate the cluster's internal networking capacity and thereby prevent legitimate service delivery.
+
+% ·····················································
+\subsubsection{Communication Integrity and Confidentiality}
+% ·····················································
+
+Every communication channel between cluster components --- between agents and the management orchestrator, between the monitoring subsystem and the data aggregator, between the orchestrator and the provisioning layer, and between the system and the human administrator --- is protected by a \textit{digital signature} scheme. Each message is accompanied by a cryptographic signature generated with the sender's private key. The recipient verifies the signature before processing the message, guaranteeing both authenticity (the message originated from the claimed sender) and integrity (the message was not modified in transit). A message that fails verification is discarded, and the event is recorded in the audit log.
+
+This mechanism is particularly critical for the communication path between the cognitive agents and the action execution layer. Because the agents reason about the cluster state and produce structured remediation proposals, an adversary who could inject forged proposals into this channel could induce arbitrary infrastructure modifications. The signature requirement ensures that only genuine proposals produced by the authenticated agent processes can proceed to the execution stage.
+
+Traffic confidentiality is enforced through encrypted channels for all inter-component communications. Plaintext channels are not permitted, even on internal network segments, because internal segment compromise is treated as a credible threat model. Encryption prevents an attacker who has gained passive observation of internal traffic from extracting credentials, metric data, or management payloads.
+
+% ·····················································
+\subsubsection{Patch Management and Operational Hygiene}
+% ·····················································
+
+A foundational assumption of the security design is that every software component in the cluster will periodically contain newly disclosed vulnerabilities. The patch management strategy therefore treats vulnerability exposure as a continuous variable to be minimised, not as a binary state. A scheduled automated process runs at a fixed daily interval and applies all available security patches to every layer of the stack: the hypervisor host environment, the container runtime, the orchestration control plane, the monitoring subsystem, and the auxiliary services. This daily cadence ensures that the window between a public vulnerability disclosure and the deployment of its corresponding patch remains bounded.
+
+All software components are sourced exclusively from their official distribution channels. The use of unofficial builds, community re-packaged variants, or versions obtained from unverified third-party repositories is prohibited. This policy eliminates the supply-chain risk of deploying components that have been tampered with before reaching the cluster. Wherever a component offers a mechanism to verify the authenticity of its distribution artefact --- such as a signed package manifest or a content-addressed image digest --- that mechanism is validated before installation.
+
+The combination of daily patching and verified sourcing is complemented by the runtime monitoring described below: even if a vulnerability is exploited in the interval between its disclosure and the application of its patch, the anomaly detection subsystem is designed to surface the resulting abnormal behaviour before the attacker can consolidate their position.
+
+% ·····················································
+\subsubsection{Runtime Anomaly Detection and Security Monitoring}
+% ·····················································
+
+The monitoring subsystem described in the preceding section serves a dual purpose: it provides the operational telemetry that drives the resource management layer, and it serves as the primary source of security signals for the cluster. A dedicated security monitoring agent operates continuously, subscribing to the same telemetry streams as the alert manager but applying a different analytical lens oriented toward behavioural deviation rather than resource saturation.
+
+The agent evaluates the state of every observable component --- hypervisor nodes, virtual machines, container workloads, network devices, and software-defined infrastructure --- against both static integrity baselines and dynamically learned behavioural profiles. Deviations from expected behaviour, such as unusual process execution patterns, unexpected network connections originating from workload containers, anomalous spikes in log emission rates, or modifications to critical configuration files, are classified by severity.
+
+A \textbf{critical} classification triggers an immediate alert routed directly to the system administrator, bypassing any aggregation or batching mechanisms. The alert carries sufficient contextual information for the administrator to evaluate the scope of the incident and take immediate containment action. A \textbf{warning} classification appends the anomalous event to a curated warning queue. The warning queue is reviewed and dispatched to the administrator at a configured periodic interval, allowing human attention to be applied at a cadence appropriate to the lower urgency of these signals without overwhelming the administrator with real-time notifications for every minor deviation. This two-tier severity routing mirrors the distinction between immediate remediation and periodic human review that governs the resource management alert manager, ensuring a consistent operational model across both functional domains.
+
+% ·····················································
+\subsubsection{Cognitive Agent Security}
+% ·····················································
+
+The cognitive agent system introduces a qualitatively distinct security challenge: the agents are autonomous decision-makers with the authority to propose infrastructure modifications. The security design for this layer addresses three specific threat vectors: unauthorised use of the agent interface, privilege escalation through adversarial prompting or model manipulation, and the systemic risk of fully autonomous execution of high-consequence actions.
+
+\paragraph{Administrator Authentication.}
+
+Access to the cognitive agent interface is gated by explicit administrator authentication. Before any natural-language query can be submitted to the Planner, the requesting party must demonstrate possession of valid credentials. In deployments with a single administrator, this requirement functions as a standard access control. In deployments with multiple administrators, access is further governed by a role-based authorisation model: each administrator is assigned a set of permitted operations, and the agent interface enforces these permissions before forwarding any request to the agent pipeline. This ensures that the authority to trigger cluster management operations through the agent is scoped to the same level as the authority to perform those operations manually.
+
+\paragraph{Privilege Escalation Prevention.}
+
+The Critic agent enforces a monotonic risk classification constraint: it may escalate the risk level assigned by the Planner, but it is constitutionally prohibited from lowering it. This one-directional constraint is a structural defence against adversarial jailbreaking scenarios in which a malicious input causes the Planner to misclassify a high-consequence action as low-risk in order to bypass the Human-in-the-Loop approval gate. Even if the Planner's classification is compromised, the Critic's independent evaluation and its inability to reduce the risk level ensure that the escalation path remains intact. An action that the Planner mislabels as low-risk but that the Critic correctly identifies as high-risk will still be routed to the administrator approval queue.
+
+Furthermore, the cognitive agents do not possess direct credentials to the infrastructure management interfaces. They produce structured remediation proposals that are submitted to a central orchestration layer. This orchestration layer independently validates the execution context, verifies that the proposed action falls within the permitted parameter space, and only then dispatches the corresponding command to the provisioning interface. The agents are therefore isolated from direct infrastructure access; a compromised or hallucinating agent can produce a proposal, but cannot bypass the validation layer to execute it.
+
+\paragraph{Human-in-the-Loop as a Security Boundary.}
+
+The Human-in-the-Loop escalation mechanism described in the autonomous decision-making subsection functions as both an operational safety mechanism and a security boundary. High-risk actions --- those classified as destructive, irreversible, or highly disruptive --- are placed in an approval queue and cannot proceed until the administrator provides explicit authorisation. This authorisation is not merely a notification acknowledgement; it is a deliberate decision gate that requires the administrator to review the full context of the proposed action: the Planner's reasoning, the Critic's evaluation, the expected effect, and the prescribed rollback strategy.
+
+The approval queue entries are bounded by a time-to-live: a high-risk action that does not receive administrator authorisation within a defined window is automatically rejected and recorded as expired. This TTL mechanism prevents an adversary from poisoning the approval queue with a malicious high-risk action and then waiting indefinitely for an administrator to accidentally approve it during a moment of inattention. Expired actions are logged with their full provenance, providing a forensic record of attempted but unauthorised operations.
+
+\paragraph{Immutable Audit Trail.}
+
+Every event in the pipeline --- Planner proposals, Critic verdicts, execution outcomes, administrator approvals and rejections, and TTL expirations --- is appended to an append-only audit log. This log is the authoritative record of every decision the autonomous system has made and every action the human administrator has taken. It serves three security functions: it enables post-incident forensic reconstruction of the sequence of events leading to any infrastructure state; it provides the evidence base for detecting patterns of misuse or gradual privilege escalation that would be invisible in any single event; and it creates accountability, ensuring that the provenance of every infrastructure change --- whether autonomous or human-initiated --- is permanently traceable \cite{gu2023towards, saxena2022secure}.
+
+% ·····················································
+\subsubsection{Virtualisation and Containerisation Restrictions}
+% ·····················································
+
+The virtualisation and containerisation layers are subjected to a set of hardening constraints that reduce the attack surface exposed by the isolation mechanisms they provide. Virtual machines are configured with the minimum set of virtual hardware devices required for their workloads; unused device types are removed to eliminate associated driver attack surfaces. Hypervisor-level resource isolation is configured to prevent any single tenant's workloads from monopolising physical resources and thereby inducing a denial-of-service condition on co-located tenants.
+
+At the container layer, each workload is granted only the kernel capabilities strictly necessary for its function. The default set of capabilities available to a container process is restricted to prevent privilege escalation exploits that rely on overly permissive capability sets. Container filesystems are mounted read-only wherever the workload does not require write access, reducing the persistence of any artefacts an attacker might attempt to install. Inter-container communication is governed by explicit network policy rules that restrict which workloads may communicate with which, consistent with the microsegmentation architecture described above. Furthermore, secure placement strategies are critical to minimize co-residency threats and side-channel attacks among heterogeneous workloads \cite{saxena2022secure}.
+
+The monitoring and load-balancing infrastructure components, which require elevated access to observe the behaviour of other workloads, are isolated in their own network segment and run under dedicated service identities whose scope of authority is limited to observation and metric collection. They do not possess credentials to issue provisioning commands, ensuring that a compromise of the monitoring layer cannot be leveraged to modify the cluster topology.
  
 % ===================================================================
 \section{Synthesis}
@@ -805,49 +977,60 @@ containerisation, and monitoring --- and the three operational pillars
 form a coherent, self-regulating infrastructure capable of sustaining a
 high-load web application at scale while respecting the twin constraints
 of cost efficiency and high availability.
- 
+
 % ============================================================
-% BIBTEX ENTRIES (add to your .bib file):
-%
-% @book{tanenbaum2017distributed,
-%   author    = {Tanenbaum, Andrew S. and Van Steen, Maarten},
-%   title     = {Distributed Systems: Principles and Paradigms},
-%   edition   = {3},
-%   publisher = {Pearson}, year = {2017}
-% }
-% @article{buyya2009cloud,
-%   author  = {Buyya, Rajkumar and Yeo, Chee Shin and Venugopal, Srikumar
-%              and Broberg, James and Brandic, Ivona},
-%   title   = {Cloud Computing and Emerging {IT} Platforms},
-%   journal = {Future Generation Computer Systems},
-%   volume  = {25}, number = {6}, pages = {599--616}, year = {2009}
-% }
-% @inproceedings{meng2020survey,
-%   author    = {Meng, Yuan and Zhang, Shenglin and Sun, Yongqian and others},
-%   title     = {Localizing Failure Root Causes in a Microservice through
-%                Causality Inference},
-%   booktitle = {Proc.\ 28th IEEE Intl.\ Conf.\ on Network Protocols (ICNP)},
-%   year      = {2020}, publisher = {IEEE}
-% }
-% @techreport{rose2020zero,
-%   author      = {Rose, Scott and Borchert, Oliver and Mitchell, Stu and Connelly, Sean},
-%   title       = {Zero Trust Architecture},
-%   institution = {NIST}, number = {SP 800-207}, year = {2020}
-% }
-% @article{mirjalili2016woa,
-%   author  = {Mirjalili, Seyedali and Lewis, Andrew},
-%   title   = {The Whale Optimisation Algorithm},
-%   journal = {Advances in Engineering Software},
-%   volume  = {95}, pages = {51--67}, year = {2016}
-% }
-% @article{storn1997de,
-%   author  = {Storn, Rainer and Price, Kenneth},
-%   title   = {Differential Evolution --- A Simple and Efficient Heuristic
-%              for Global Optimization over Continuous Spaces},
-%   journal = {Journal of Global Optimization},
-%   volume  = {11}, number = {4}, pages = {341--359}, year = {1997}
-% }
-% -- reuse from Chapter 1: hoke2006intemon, andreolini2014closer, beyer2016sre
+% BIBLIOGRAPHY
 % ============================================================
+\begin{thebibliography}{99}
+
+\bibitem{balabanov2025dcim}
+G.~Balabanov and N.~S. Apostolov, ``Data Centre Infrastructure Monitoring,'' in \textit{60th International Scientific Conference on Information, Communication and Energy Systems and Technologies (ICEST)}, IEEE, 2025.
+
+\bibitem{mirjalili2016woa}
+S.~Mirjalili and A.~Lewis, ``The Whale Optimisation Algorithm,'' \textit{Advances in Engineering Software}, vol. 95, pp. 51--67, 2016.
+
+\bibitem{storn1997de}
+R.~Storn and K.~Price, ``Differential Evolution --- A Simple and Efficient Heuristic for Global Optimization over Continuous Spaces,'' \textit{Journal of Global Optimization}, vol. 11, no. 4, pp. 341--359, 1997.
+
+\bibitem{lai2025energy}
+X.~Lai, X.~Zheng, and W.~Lu, ``Energy-aware Virtual Machine Migration based on Dual Thresholds of Server Resource Utilization Rate considering Performance Interference,'' in \textit{2025 IEEE 2nd International Conference on Big Data Science and Engineering (ICBDSE)}, IEEE, 2025.
+
+\bibitem{zhang2020intelligent}
+P.~Zhang, M.~Zhou, and X.~Wang, ``An Intelligent Optimization Method for Optimal Virtual Machine Allocation in Cloud Data Centers,'' \textit{IEEE Transactions on Automation Science and Engineering}, vol. 17, no. 4, pp. 1725--1735, 2020.
+
+\bibitem{begam2020timer}
+R.~Begam, W.~Wang, and D.~Zhu, ``TIMER-Cloud: Time-Sensitive VM Provisioning in Resource-Constrained Clouds,'' \textit{IEEE Transactions on Cloud Computing}, vol. 8, no. 1, pp. 297--311, 2020.
+
+\bibitem{saxena2022secure}
+D.~Saxena, I.~Gupta, J.~Kumar, A.~K. Singh, and X.~Wen, ``A Secure and Multiobjective Virtual Machine Placement Framework for Cloud Data Center,'' \textit{IEEE Systems Journal}, vol. 16, no. 2, pp. 3163--3174, 2022.
+
+\bibitem{sung2024cloning}
+J.~Sung, S.~Han, and J.~Kim, ``Cloning-based virtual machine pre-provisioning for resource-constrained edge cloud server,'' \textit{Cluster Computing}, vol. 27, pp. 1831--1847, 2024.
+
+\bibitem{senjab2023survey}
+K.~Senjab, S.~Abbas, N.~Ahmed, and A.~R. Khan, ``A survey of Kubernetes scheduling algorithms,'' \textit{Journal of Cloud Computing}, vol. 12, no. 87, 2023.
+
+\bibitem{bompotas2025commc}
+A.~Bompotas, N.-R. Kalogeropoulos, and C.~Makris, ``CommC: A Multi-Purpose COMModity Hardware Cluster,'' \textit{Future Internet}, vol. 17, no. 121, 2025.
+
+\bibitem{gu2023towards}
+H.~Gu, J.~Wang, J.~Yu, D.~Wang, B.~Li, X.~He, and X.~Yin, ``Towards virtual machine scheduling research based on multi-decision AHP method in the cloud computing platform,'' \textit{PeerJ Computer Science}, vol. 9, e1675, 2023.
+
+\bibitem{tuli2023cilp}
+S.~Tuli, G.~Casale, and N.~R. Jennings, ``CILP: Co-simulation based Imitation Learner for Dynamic Resource Provisioning in Cloud Computing Environments,'' \textit{arXiv preprint}, arXiv:2302.05630v2, 2023.
+
+\bibitem{nguyen2022load}
+Q.-M. Nguyen, L.-A. Phan, and T.~Kim, ``Load-Balancing of Kubernetes-Based Edge Computing Infrastructure Using Resource Adaptive Proxy,'' \textit{Sensors}, vol. 22, no. 2869, 2022.
+
+\bibitem{yang2025task}
+R.~Yang, Z.~Li, J.~Qian, and Z.~Li, ``Task-Driven Virtual Machine Optimization Placement Model and Algorithm,'' \textit{Future Internet}, vol. 17, no. 73, 2025.
+
+\bibitem{alahmad2024multiple}
+Y.~Alahmad and A.~Agarwal, ``Multiple objectives dynamic VM placement for application service availability in cloud networks,'' \textit{Journal of Cloud Computing}, vol. 13, no. 46, 2024.
+
+\bibitem{saxena2022proactive}
+D.~Saxena and A.~K. Singh, ``A proactive autoscaling and energy-efficient VM allocation framework using online multi-resource neural network for cloud data center,'' \textit{Neurocomputing}, 2022.
+
+\end{thebibliography}
 
 \end{document}
