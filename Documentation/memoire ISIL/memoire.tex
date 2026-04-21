@@ -1,0 +1,968 @@
+\documentclass[12pt,a4paper]{report}
+
+% Packages
+% \usepackage[utf8]{inputenc} % Removed: Conflicts with XeLaTeX
+% \usepackage[T1]{fontenc}    % Removed: Conflicts with XeLaTeX
+\usepackage{fontspec}         % Added: Native font handling for XeLaTeX
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{tocloft}
+\usepackage{titlesec}
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+
+% Package for Arabic script (replaces babel — the two are incompatible)
+\usepackage{polyglossia}
+\setmainlanguage{english}
+\setotherlanguage{arabic}
+\newfontfamily\arabicfont[Script=Arabic]{Amiri}
+
+% hyperref must be loaded last
+\usepackage{hyperref}
+
+% Page geometry for the whole document
+\geometry{
+    left=3cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% Line spacing
+\onehalfspacing
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Chapter and section formatting
+\titleformat{\chapter}[display]
+{\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-20pt}{40pt}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue,
+    urlcolor=blue,
+    pdftitle={End of Studies Project Report},
+    pdfauthor={Your Name}
+}
+
+\begin{document}
+
+% Title Page - ULTRA COMPACT VERSION
+\newgeometry{left=2.5cm, right=2.5cm, top=1.5cm, bottom=1.5cm} % Temporary smaller margins for title page
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+
+\vspace*{-1cm} % Start even higher on the page
+
+%-----------------------------------------------------------
+% Country + Ministry - Made smaller
+%-----------------------------------------------------------
+{\footnotesize Democratic and People's Republic of Algeria}\\
+{\footnotesize \textarabic{الجمهورية الجزائرية الديمقراطية الشعبية}}
+
+{\footnotesize Ministry of Higher Education and Scientific Research}\\
+{\footnotesize \textarabic{وزارة التعليم العالي و البحث العلمي}}
+
+\vspace{0.2cm}
+\rule{\textwidth}{0.3pt} % Thinner rule
+\vspace{0.2cm}
+
+%-----------------------------------------------------------
+% Logo + University
+%-----------------------------------------------------------
+\begin{minipage}{0.25\textwidth} % Slightly smaller
+\centering
+\includegraphics[width=0.9\textwidth]{graphics/USTHB.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.7\textwidth} % Slightly larger to compensate
+\centering
+{\footnotesize \textarabic{جامعة العلوم والتكنولوجيا هواري بومدين}}\\
+{\footnotesize University of Science and Technology Houari Boumediene}
+\end{minipage}
+
+\vspace{0.4cm} % Reduced from 0.8cm
+
+%-----------------------------------------------------------
+% Faculty information
+%-----------------------------------------------------------
+{\LARGE \textbf{Faculty of Informatics}}\\ % Reduced from \Large
+\vspace{0.5cm} % Reduced
+{\normalsize Bachelor's degree}\\ % Reduced from \large
+{\normalsize graduation thesis.}\\
+\vspace{0.5cm} % Reduced
+{\normalsize \textbf{Option : Information Systems and Software Engineering}} % Reduced from \large
+
+\vspace{0.3cm} % Reduced from 0.6cm
+\rule{\textwidth}{0.6pt} % Thinner rule
+\vspace{0.3cm} % Reduced from 0.6cm
+
+%-----------------------------------------------------------
+% Main title - Slightly smaller font
+%-----------------------------------------------------------
+{\Large \textbf{Design and Implementation of an}}\\ % Reduced from \LARGE
+{\Large \textbf{automatic and intelligent provisioning solution}}\\
+{\Large \textbf{for IT resources to enable the scalable deployment of a high-load web application.}}
+
+\vspace{0.3cm} % Reduced from 0.6cm
+\rule{\textwidth}{0.6pt} % Thinner rule
+\vspace{0.3cm} % Reduced from 0.6cm
+
+%-----------------------------------------------------------
+% Authors and supervisors
+%-----------------------------------------------------------
+\begin{minipage}{0.45\textwidth}
+\normalsize \textit{Realized by :}\\ % Added \normalsize
+Zertal Mohamed El Hadi\\
+Hamdani Younes Abdelouahed\\
+Zediri Widad\\
+Razem Ikram
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+\normalsize \textit{Supervised by :}\\
+Mr. Zeraoulia Khaled
+\end{minipage}
+
+\vspace{1cm} % Reduced from 0.8cm
+
+%-----------------------------------------------------------
+% Jury
+%-----------------------------------------------------------
+{\normalsize Held on xx/xxxx/2026, before the jury composed of :} % Made \footnotesize
+
+{\normalsize xxx \hspace{0.8cm} -- President of jury}\\
+{\normalsize xxx \hspace{0.3cm} -- Examiner} % Made \footnotesize
+
+\vspace{0.8cm} % Reduced from 0.8cm
+
+%-----------------------------------------------------------
+% Footer
+%-----------------------------------------------------------
+{\normalsize Promotion : 2025--2026}\\ % Made \footnotesize
+{\normalsize Code PFE : ISIL-67}
+
+\end{titlepage}
+\restoregeometry % Restore original margins for the rest of the document
+
+%=============================================================
+% FRONT MATTER — Roman numeral page numbering (i, ii, iii, ...)
+%=============================================================
+\pagenumbering{roman}
+
+% Dedication (Optional)
+\newpage
+\chapter*{Dedication}
+\addcontentsline{toc}{chapter}{Dedication}
+\thispagestyle{empty}
+\vspace*{0.2\textheight}
+\begin{center}
+    \textit{To be implemented.}
+\end{center}
+\newpage
+
+% Acknowledgements
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+
+To be implemented
+
+\newpage
+
+% Abstract
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+To be implemented
+
+\textbf{Keywords:} To be implemented
+
+\newpage
+
+% Table of Contents
+\tableofcontents
+\newpage
+
+% List of Figures
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+\newpage
+
+% List of Tables
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+\newpage
+
+% List of Abbreviations
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+
+\begin{tabbing}
+\hspace{3cm} \= \kill
+\textbf{API} \> Application Programming Interface \\
+\textbf{CI/CD} \> Continuous Integration/Continuous Deployment \\
+\textbf{CPU} \> Central Processing Unit \\
+\textbf{DevOps} \> Development and Operations \\
+\textbf{HTTP} \> Hypertext Transfer Protocol \\
+\textbf{IT} \> Information Technology \\
+\textbf{OS} \> Operating System \\
+\textbf{REST} \> Representational State Transfer \\
+\textbf{SaaS} \> Software as a Service \\
+\textbf{VM} \> Virtual Machine \\
+\textbf{VPN} \> Virtual Private Network \\
+\end{tabbing}
+
+\newpage
+
+% General Introduction
+\chapter*{General Introduction}
+\addcontentsline{toc}{chapter}{General Introduction}
+
+to be implemented
+\newpage
+
+%=============================================================
+% MAIN MATTER — Arabic numeral page numbering, restarting at 1
+%=============================================================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% Chapter 1
+\chapter{Theoretical Foundation and Architectural Paradigms}
+
+\section{Introduction}
+
+Modern software development has been shaped by evolving scalability demands and the need for efficient resource utilization. Virtualization and containerization have fundamentally altered how applications are developed, deployed, and managed. This chapter establishes the theoretical foundation for these paradigm shifts, covering their core concepts, operational characteristics, and relationship to microservices architecture, before critically examining whether organizations face a genuine imperative to adopt them.
+
+\section{Virtualization and Containerization}
+
+\subsection{Virtualization}
+
+Virtualization enables the creation of simulated computing environments abstracted from physical hardware. A hypervisor partitions physical resources into isolated virtual machines (VMs), each with its own allocated CPU, memory, storage, and network interfaces \cite{popek1974formal}. By decoupling software execution from hardware, multiple operating systems can coexist on a single server while remaining operationally independent \cite{rosenblum2005virtual}.
+
+Key advantages include resource consolidation, reduced infrastructure costs, live migration of running VMs between hosts, rapid provisioning of environments, and flexible workload placement \cite{vmware2006consolidation, barham2003xen}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.75\textwidth]{graphics/vm_architecture.png}
+    \caption{Virtual Machine Architecture Overview}
+    \label{fig:vm_architecture}
+\end{figure}
+
+\subsection{Containerization}
+
+Containerization is a lightweight alternative that operates at the operating-system level rather than the hardware level. Containers encapsulate application code with its dependencies into portable units that share the host OS kernel, using kernel features such as \textit{namespaces} for isolation and \textit{control groups} for resource limiting \cite{merkel2014docker, soltesz2007container}.
+
+Key advantages include faster startup times, higher deployment density, consistent behavior across environments, natural alignment with microservices and CI/CD pipelines, and declarative version-controlled definitions that simplify rollbacks \cite{bernstein2014containers, pahl2015containerization}.
+
+
+\section{Virtualized and Containerized Environments}
+
+\subsection{Virtual Machine Architecture}
+
+Hypervisors come in two types: Type~1 (bare-metal) run directly on hardware, while Type~2 run atop a host OS \cite{rosenblum2005virtual}. Each VM includes a full guest OS and virtualized hardware managed by the hypervisor, providing strong isolation at the cost of higher resource overhead and longer boot times \cite{barham2003xen}.
+
+
+
+\subsection{Container-Based Environments}
+
+Container runtimes such as Docker or containerd interface with the host kernel to create isolated execution contexts. Namespaces prevent containers from observing processes outside their scope; control groups prevent resource monopolization; and union file systems allow containers to share common base layers while maintaining isolated writable layers \cite{merkel2014docker, soltesz2007container}.
+
+
+
+Container orchestration platforms such as Kubernetes add automated scheduling, service discovery, health monitoring, and rolling updates to manage containers at scale \cite{burns2016borg}.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.75\textwidth]{graphics/container_environment.png}
+    \caption{Container-Based Environment and Components}
+    \label{fig:container_environment}
+\end{figure}
+
+\section{Microservices Architecture}
+
+\subsection{Definition and Principles}
+
+Microservices structures applications as collections of loosely coupled, independently deployable services, each implementing a specific business capability and owning its own data store \cite{newman2015microservices}. Core principles include single responsibility, bounded contexts from domain-driven design, lightweight communication via HTTP APIs or message queues, decentralized governance, and built-in resilience patterns such as circuit breakers and timeouts \cite{fowler2014microservices, richardson2018microservices}.
+
+\subsection{Benefits and Challenges}
+
+Microservices enable independent deployability, technology heterogeneity, granular scalability, team autonomy, and incremental modernization of legacy systems \cite{newman2015microservices, fowler2014microservices}.
+
+However, they introduce significant complexity: distributed debugging requires sophisticated monitoring and tracing; cross-service transactions demand eventual consistency models; network latency introduces new failure points; and substantial operational infrastructure---service discovery, load balancing, orchestration---becomes necessary \cite{richardson2018microservices}.
+
+\section{Microservices versus Monolithic Architecture}
+
+Monolithic architecture integrates all components---UI, business logic, and data access---into a single codebase sharing a common database, deployed as one unit \cite{fowler2014microservices}. Components communicate through in-process calls, simplifying initial development and ensuring strong data consistency.
+
+The key structural differences are summarized as follows. Monoliths exhibit tight coupling where changes ripple across the codebase, while microservices enforce loose coupling through stable interfaces. Monoliths use a shared database with strong consistency; microservices use per-service databases, complicating cross-service transactions. Monoliths scale by replicating the entire application; microservices enable selective scaling of individual components. Failures in a monolith can cascade system-wide, whereas microservices contain failures within service boundaries---though distributed failures introduce new failure modes \cite{newman2015microservices, richardson2018microservices, fowler2014microservices}.
+
+\section{Critical Analysis: The Imperative for Microservices with Containerization and Virtualization}
+
+\subsection{Limitations of Traditional Deployment}
+
+Traditional deployment on physical or dedicated virtual servers suffers from documented inefficiencies. Infrastructure often operates below 20--30 percent average utilization while being over-provisioned for peak loads, representing substantial capital waste \cite{vmware2006consolidation}. Manual provisioning is slow and inconsistent, limiting organizational responsiveness. Environmental discrepancies between development and production cause deployment failures \cite{merkel2014docker}, and monolithic architectures offer limited fault tolerance \cite{rosenblum2005virtual}.
+
+\subsection{Should Organizations Transition to Microservices and Virtualization/Containerization Environments?}
+
+The strategic question is straightforward to pose but difficult to answer: \textit{should organizations transition to microservices supported by virtualization and containerization?}
+
+The case for transition is clear in principle. Containerization delivers consistency and resource efficiency; virtualization enables consolidation; microservices unlock deployment velocity and team autonomy \cite{merkel2014docker, richardson2018microservices}. Yet the associated costs are substantial. Container orchestration demands specialized expertise, migration requires significant investment in infrastructure and personnel, and the operational maturity required for distributed microservices exceeds what most organizations have built through traditional models \cite{burns2016borg, bernstein2014containers}.
+
+The decision is further complicated by inherent contradictions: larger organizations may benefit most from consolidation yet face more complex migrations; stable legacy systems may gain little from disruption; and containerization without architectural transformation yields limited benefits, while microservices without containerization introduce different operational burdens. Organizations must determine not only \textit{whether} to adopt these technologies but \textit{in what sequence and scope}---questions for which industry guidance remains conflicting and empirical evidence limited \cite{barham2003xen}.
+
+\bibliographystyle{plain}
+
+% ============================================================
+% CHAPTER 2
+% ============================================================
+% Chapter 2
+\chapter{Conception and Architectural Design}
+
+\section{Introduction}
+
+Building a cluster infrastructure for a high-demand web application requires decisions at many
+different levels — from how physical servers are arranged and connected, down to how individual
+containers are scheduled and monitored. Each of these decisions directly affects two things: how
+much the system costs to run, and how reliably it stays available. This chapter presents the full
+architectural design of such a system, organised around three main pillars.
+
+The first pillar is the proof of concept, which defines clear validation criteria that must be met
+before any large-scale deployment begins. The second pillar is the layered infrastructure design:
+a four-layer stack made up of physical hardware, virtual machines, application containers, and a
+monitoring plane, where each layer builds on the one below it. The third pillar is the intelligence
+and security component: a natural-language assistant that helps operators manage the cluster, a
+predictive model that anticipates resource problems before they occur, and a security design that
+protects the entire stack.
+
+These three pillars are closely connected, not independent. The monitoring layer feeds live usage
+data into the placement algorithm; the security layer protects the integrity of that data; and the
+predictive model learns from the historical records that the monitoring layer collects over time.
+Each section below makes these connections explicit.
+
+% -----------------------------------------------------------------------------
+\section{Proof of Concept: Goals and Validation}
+
+\subsection{Design Objectives}
+
+The system must host a web application with traffic that can be both unpredictable and very high.
+This creates two requirements that pull in opposite directions. The first is resource efficiency:
+physical servers are expensive to buy, power, and maintain, so their capacity should be used as
+fully as possible. Workloads must be packed tightly, and scaling decisions must be based on actual
+observed demand, not worst-case estimates. The second requirement is continuous availability: users
+must not experience any interruption, whether caused by a hardware failure, an unexpected traffic
+spike, or a software fault.
+
+The tension between these two goals is real. Packing workloads tightly onto fewer servers increases
+the impact of a node failure, because more services are affected when a busy host goes down. On the
+other hand, leaving generous spare capacity on every host to reduce that impact directly contradicts
+the efficiency goal. The architecture resolves this conflict not by sacrificing one goal for the
+other, but by making the scheduling and scaling logic intelligent enough to adapt --- moving
+workloads when a failure occurs and adding capacity only when real usage data justifies it.
+
+The application is built as a set of loosely coupled microservices, each handling one specific
+business function and deployable on its own without affecting the others. This structure is a
+deliberate design choice: unlike a monolithic application that must be scaled as a whole, individual
+microservices can be replicated or resized in response to the exact demand they face. It also means
+that a fault in one service causes a partial degradation rather than a full outage, which is
+essential for meeting the availability requirement \cite{newman2015microservices}.
+
+\subsection{Validation Criteria}
+
+Before committing to full-scale deployment, a time-bounded proof-of-concept phase is carried out to
+verify that all the core mechanisms work correctly together: VM provisioning, container scheduling,
+inter-service communication, and auto-scaling. The PoC is considered successful only when all four
+of the following conditions are met at the same time.
+
+\begin{itemize}
+    \item \textbf{Automated provisioning:} a new VM must join the cluster fully automatically, with
+    no manual steps, and within a defined time limit --- measured from the moment the request is
+    issued to the moment the VM is ready to accept container workloads.
+
+    \item \textbf{Responsive scaling:} the system must detect injected problems --- CPU saturation,
+    memory pressure, high HTTP error rates, excessive packet loss --- and apply the correct fix
+    within one monitoring cycle.
+
+    \item \textbf{Constraint-respecting scheduling:} the container scheduler must place workloads
+    across VMs without exceeding their resource limits, and must rebalance automatically when VMs
+    are added or removed.
+
+    \item \textbf{Preserved availability:} the application must stay reachable throughout all
+    provisioning, scaling, and rebalancing operations --- confirming that availability holds even
+    under the most disruptive conditions.
+\end{itemize}
+
+% -----------------------------------------------------------------------------
+\section{Infrastructure Layers}
+
+The cluster is organised into four layers stacked on top of each other. The physical layer provides
+raw compute, storage, and network capacity. The virtualisation layer turns that capacity into
+manageable virtual machines. The containerisation layer runs application workloads as containers
+distributed across those VMs. The monitoring layer watches the state of all three layers below it
+and triggers automated responses when needed. Each layer uses the services of the one below it and
+provides higher-level functions to the layer above, forming a complete stack from bare metal to
+running application.
+
+\subsection{Physical and Network Foundation}
+
+At the base of the stack sits the physical layer: the servers, switches, routers, and firewalls
+that make up the tangible infrastructure. Physical servers provide the compute and storage capacity
+that everything else runs on. They are connected through a managed switching fabric that separates
+traffic between internal segments and keeps communication between VMs and containers fast and
+predictable. At the network edge, hardware firewalls check all incoming and outgoing traffic and
+block anything that does not follow the declared access rules before it can reach any internal
+service. Dedicated routers handle routing between internal segments and the connection to external
+networks.
+
+A key design principle here is the use of failure domains --- groups of servers that share a common
+point of failure, such as the same power unit or the same top-of-rack switch. Every service keeps
+replicas spread across at least two distinct failure domains, so that no single physical event can
+bring down all instances at once. All network equipment --- switches, routers, and firewalls --- is
+deployed in redundant pairs, so losing any single device does not partition the cluster or interrupt
+any running service \cite{barroso2013datacenter}.
+
+\subsection{Virtualisation Layer: Placement, Partitioning, and Scaling}
+
+The virtualisation layer turns raw physical capacity into a managed fleet of virtual machines. Each
+VM is an isolated environment with its own allocated virtual CPUs, memory, disk, and network
+bandwidth. Three main problems need to be solved at this layer: how to size each new VM when it is
+created, how to organise the fleet into logical groups, and how to place and scale VMs as demand
+changes.
+
+\subsubsection{Initial Sizing and Mini-Cluster Organisation}
+
+When a new VM is created, its initial resource allocation is based on a workload profile for the
+service it will run. This profile captures the expected resource demand, using benchmarks,
+service-level objectives, or historical data from similar services already in the cluster. A set of
+standard size classes makes provisioning easier for common workload types. The initial allocation is
+not fixed: the monitoring layer tracks per-VM usage continuously and can trigger vertical scaling if
+sustained usage patterns call for it.
+
+Beyond sizing individual VMs, the fleet is divided into $k$ logical mini-clusters. Each
+mini-cluster groups VMs whose workloads are closely related --- meaning microservices that
+communicate frequently or share large amounts of data. Keeping this traffic within one mini-cluster
+reduces network overhead and makes communication policies easier to manage. The partitioning also
+limits the scope of each placement decision: instead of searching all $n$ physical machines across
+the whole cluster, the algorithm only looks at the $n/k$ hosts in the relevant mini-cluster, which
+reduces scheduling complexity by a factor of $k$. As an added benefit, the partitioning keeps
+resources balanced across mini-clusters, preventing any single segment from becoming overloaded
+\cite{beloglazov2012optimal}.
+
+The number of mini-clusters $k$ can be set in two ways. In static mode, $k$ is chosen by the
+application designer before deployment, based on the known structure of the service dependency
+graph. In dynamic mode, a machine learning model watches inter-service communication patterns and
+resource usage at runtime and adjusts $k$ as the application evolves. Dynamic mode is the
+long-term target; static mode provides a solid and immediately usable starting point when not
+enough historical data is available yet.
+
+\subsubsection{Provisioning Algorithm and Fitness Evaluation}
+
+When a VM needs to be placed on a physical host --- either at creation time or after a live
+migration --- the provisioning algorithm selects the best available physical machine within the
+target mini-cluster. The algorithm is a custom hybrid built from two well-known meta-heuristic
+optimisation methods: the Whale Optimisation Algorithm (WOA) \cite{mirjalili2016woa} and
+Differential Evolution (DE) \cite{storn1997de}. Rather than using either method in its standard
+form, the design takes the best mechanism from each and combines them into a single procedure.
+
+The WOA is inspired by the bubble-net hunting behaviour of humpback whales. A population of
+candidate placements moves toward the current best solution by either encircling it, spiralling
+around it, or jumping toward a random population member. This mix of exploitation and exploration
+makes the algorithm good at avoiding premature convergence. DE works differently: it builds trial
+solutions by computing a weighted difference between two randomly chosen population members and
+adding it to the current best, then mixing the result with the original candidate through a
+crossover step. A greedy selection step keeps whichever of the two scores better.
+
+The hybrid splits the population at each iteration into two separate subsets. The first subset is
+updated using WOA-style position equations, which balance spiral exploitation with convergence
+toward the best solution. The second subset is updated using DE-style mutation, crossover, and
+greedy selection. After both subsets are processed, the global best $X^{*}$ is updated to reflect
+the best candidate found across the whole population. This split prevents the entire population from
+collapsing too quickly toward $X^{*}$ --- a known weakness of pure WOA --- while also avoiding the
+aimless drift that can happen in DE when population diversity runs low.
+
+The fitness function used by both phases measures how well a candidate physical machine's available
+resources match what the VM needs. Four dimensions are considered: CPU capacity ($C$), RAM ($R$),
+combined I/O throughput for storage and network ($IO$), and energy draw ($E$).
+Table~\ref{tab:fitness} summarises these dimensions.
+
+\begin{table}[h]
+\centering
+\caption{Fitness Function Resource Dimensions}
+\label{tab:fitness}
+\begin{tabular}{|l|c|c|p{6.5cm}|}
+\hline
+\textbf{Dimension} & \textbf{Symbol} & \textbf{Unit} & \textbf{Rationale} \\
+\hline
+CPU Capacity   & $C$   & vCores & Prevents compute starvation \\
+\hline
+RAM            & $R$   & GB     & Avoids memory-induced swapping \\
+\hline
+I/O Throughput & $IO$  & MB/s   & Guards storage and network bandwidth \\
+\hline
+Energy Draw    & $E$   & J/hr   & Minimises operational energy cost \\
+\hline
+\end{tabular}
+\end{table}
+
+Because these dimensions use different units, each is first normalised using z-score
+standardisation across the candidate machines in the mini-cluster:
+
+\begin{equation}
+    X^{*}_{i} = \frac{X_{i} - \bar{X}}{\sigma_{X}}
+    \label{eq:normalisation}
+\end{equation}
+
+where $\bar{X}$ and $\sigma_{X}$ are the mean and standard deviation of metric $X$ across the
+candidate set. The normalised values are then combined into a weighted Euclidean distance:
+
+\begin{equation}
+    \mathrm{fitness} = \sqrt{w_1 \cdot (\Delta C)^2 + w_2 \cdot (\Delta R)^2 +
+    w_3 \cdot (\Delta IO)^2 + w_4 \cdot (\Delta E)^2}
+    \label{eq:fitness}
+\end{equation}
+
+Here $\Delta X$ is the gap between what the VM requests and what the candidate host has available.
+Squaring these gaps penalises large mismatches more than small ones, which reflects the priority of
+avoiding placements that leave a VM under-provisioned. The weights $w_i$ are set by the application
+designer and must satisfy $\sum_{i=1}^{4} w_i = 1$, allowing each resource dimension to be weighted
+according to the workload's specific needs. A lower fitness score means a better match.
+
+Figure~\ref{fig:woa_de} shows the full execution flow of the hybrid algorithm as a swimlane
+diagram, making the parallel structure of the two phases --- and the shared $X^{*}$ synchronisation
+point --- easy to follow visually.
+
+\begin{figure}[P]
+    \centering
+    % Insert swimlane flowchart image here, e.g.:
+    \includegraphics[width=\textwidth]{graphics/VM-Provisioning.pdf}
+    \caption{Hybrid WOA--DE provisioning algorithm (swimlane view). Left lane: WOA update phase.
+    Right lane: DE mutation, crossover and selection phase. Centre: shared $X^{*}$
+    synchronisation.}
+    \label{fig:woa_de}
+\end{figure}
+
+\subsubsection{Step-by-step Algorithm Specification}
+
+\textbf{Algorithmic rationale.}
+At each iteration the candidate population is partitioned into two disjoint subsets. The first
+subset undergoes WOA-style position updates, exploiting the algorithm's well-characterised balance
+between spiral exploitation and contraction-based convergence toward the global best $X^{*}$. The
+second subset undergoes DE-style mutation and crossover, with the trial vector competing against its
+parent through greedy selection: only if the trial achieves strictly lower fitness does it replace
+the parent. After both subsets have been processed, $X^{*}$ is refreshed to reflect the best
+candidate across the entire updated population. This split simultaneously addresses the two
+principal failure modes of the constituent algorithms: it prevents premature convergence toward
+$X^{*}$ (a known weakness of pure WOA), and it avoids the directionless stagnation that can develop
+in DE when inter-individual diversity collapses.
+
+\textbf{Notation.}
+Let $n$ denote the total population size and $T$ the maximum number of iterations. Each candidate
+solution $X_i$ encodes a complete mapping of the virtual machines to be placed onto the physical
+machines of the target mini-cluster. The quality of a mapping is measured by the fitness function
+$f$ defined in Equation~(\ref{eq:fitness}): a lower value of $f(X_i)$ indicates a closer match.
+The symbol $X^{*}$ denotes the globally tracked best mapping seen at any point during the search,
+and $b$ is the logarithmic spiral constant that shapes the WOA spiral trajectory.
+
+\textbf{Population initialisation.}
+Draw $n$ candidate mappings $\{X_0, X_1, \ldots, X_{n-1}\}$ independently and uniformly at random
+from the space of feasible VM-to-host assignments within the target mini-cluster. Evaluate $f(X_i)$
+for every candidate and set $X^{*}$ to the mapping with the lowest fitness value. Initialise the
+WOA linear decay parameter $a_0 = 2$, the DE scaling factor $F$, and the crossover rate $CR =
+0.5$. Set the iteration counter $t = 0$.
+
+\textbf{Iterative refinement loop} (repeat for $t = 0, 1, \ldots, T - 1$):
+
+\begin{enumerate}
+
+    \item \textbf{Parameter update.} Compute the iteration-specific control coefficients:
+    \begin{equation}
+        a = 2\!\left(1 - \frac{t}{T}\right), \qquad
+        A = 2a r_1 - a, \qquad
+        C = 2 r_2
+        \label{eq:params}
+    \end{equation}
+    where $r_1, r_2 \sim \mathrm{Uniform}(0,1)$ are drawn independently at each iteration, and a
+    probability $p \sim \mathrm{Uniform}(0,1)$ is also sampled. As $t$ increases toward $T$, the
+    coefficient $a$ decreases linearly from 2 to 0, progressively tightening the balance between
+    global exploration and local exploitation.
+
+    \item \textbf{WOA update phase.} For each candidate $X_i$ in the WOA subset, apply one of
+    three position-update rules determined by the sampled values of $p$ and $|A|$:
+
+    \begin{itemize}
+        \item \textbf{If $p < 0.5$ and $|A| < 1$} (shrinking encirclement --- exploitation):
+        \begin{equation}
+            D = \bigl|C \cdot X^{*} - X_i(t)\bigr|, \qquad
+            X_i(t+1) = X^{*} - A \cdot D
+            \label{eq:woa_encircle}
+        \end{equation}
+        The candidate contracts toward the current best $X^{*}$, with the step magnitude governed
+        by $A$. Because $|A| < 1$, the movement always lands within the neighbourhood of $X^{*}$.
+
+        \item \textbf{If $p < 0.5$ and $|A| \geq 1$} (random-agent exploration): select
+        $X_{\mathrm{rand}}$ uniformly at random from the current population, then compute:
+        \begin{equation}
+            D = \bigl|C \cdot X_{\mathrm{rand}} - X_i(t)\bigr|, \qquad
+            X_i(t+1) = X_{\mathrm{rand}} - A \cdot D
+            \label{eq:woa_random}
+        \end{equation}
+        Moving toward a randomly selected peer diversifies the search and reduces the risk of
+        premature convergence to a local optimum.
+
+        \item \textbf{If $p \geq 0.5$} (logarithmic spiral update):
+        \begin{equation}
+            D = \bigl|X^{*} - X_i(t)\bigr|, \qquad
+            X_i(t+1) = D \cdot e^{bl} \cdot \cos(2\pi l) + X^{*}
+            \label{eq:woa_spiral}
+        \end{equation}
+        where $l \sim \mathrm{Uniform}(-1, 1)$. The candidate spirals around $X^{*}$ along a
+        logarithmic path whose tightness is controlled by $b$ and whose angular position is
+        determined by $l$, combining exploitation of the vicinity of $X^{*}$ with broad lateral
+        exploration.
+    \end{itemize}
+
+    \textit{After all members of the WOA subset have been updated, $X^{*}$ is refreshed to the
+    lowest-fitness candidate found so far across the entire population.}
+
+    \item \textbf{DE mutation, crossover, and selection.} For each candidate $X_j$ in the DE
+    subset, apply the following three operations in sequence:
+
+    \begin{enumerate}
+        \item \textit{Mutation.} Select two distinct population members $X_{r_1}$ and $X_{r_2}$
+        that belong to neither the WOA subset nor the DE subset, and construct the mutant vector:
+        \begin{equation}
+            V_j = X^{*} + F \cdot (X_{r_1} - X_{r_2})
+            \label{eq:de_mutation}
+        \end{equation}
+        Using $X^{*}$ as the base vector anchors the mutant in the best-known region of the
+        solution space while the scaled difference term introduces perturbation proportional to
+        the current population spread.
+
+        \item \textit{Crossover.} Construct the trial vector $U_j$ by independently examining
+        each component $k$ of the mapping:
+        \begin{equation}
+            U_j[k] =
+            \begin{cases}
+                V_j[k] & \text{if } \mathrm{rand}() \leq CR \\
+                X_j[k] & \text{otherwise}
+            \end{cases}
+            \label{eq:de_crossover}
+        \end{equation}
+        With $CR = 0.5$ each component is taken from the mutant vector with equal probability,
+        producing a trial vector that blends half the structural information of $X_j$ with half
+        the directed perturbation of $V_j$.
+
+        \item \textit{Greedy selection.} Evaluate the fitness of the trial vector and replace the
+        parent only if the trial achieves strictly lower fitness:
+        \begin{equation}
+            X_j \leftarrow
+            \begin{cases}
+                U_j & \text{if } f(U_j) < f(X_j) \\
+                X_j & \text{otherwise}
+            \end{cases}
+            \label{eq:de_selection}
+        \end{equation}
+        This one-step tournament ensures that population fitness is monotonically non-increasing:
+        no update can worsen the solution it replaces.
+    \end{enumerate}
+
+    \textit{After all members of the DE subset have been processed, $X^{*}$ is refreshed to the
+    best candidate observed across both the WOA and DE subset results. The iteration counter is
+    then incremented ($t \leftarrow t + 1$) and the loop returns to Step~1.}
+
+\end{enumerate}
+
+\textbf{Output.}
+After $T$ iterations, $X^{*}$ holds the recommended placement of all VMs onto physical hosts
+within the target mini-cluster. This placement is handed to the virtualisation layer, which
+creates the VMs according to the assignment and registers them in the correct mini-cluster ready
+for container scheduling.
+
+\subsubsection{Runtime Scaling Mechanisms}
+
+Resource usage and application error indicators are monitored continuously by the monitoring layer.
+When a metric crosses a defined threshold, the alert manager triggers the appropriate scaling
+response. Two scaling mechanisms are available, each addressing a different type of problem.
+
+Horizontal scaling is used when a single VM can no longer handle the incoming request volume. A
+new VM with the same resource profile is created, placed in the same mini-cluster via the
+provisioning algorithm, and added to the load-balancing pool immediately. This spreads the load
+across more instances without interrupting the ones already running. Vertical scaling is used when
+the problem is resource saturation within a single VM rather than too many requests. It adds
+vCPUs, memory, or storage to the existing VM depending on what is under pressure. If the host does
+not have enough free capacity to support the extra allocation, the VM is live-migrated to a
+better-suited host chosen by the provisioning algorithm within the mini-cluster.
+Table~\ref{tab:scaling} lists all trigger conditions and their corresponding actions.
+
+\begin{table}[h]
+\centering
+\caption{Scaling Trigger Conditions and Remediation Actions}
+\label{tab:scaling}
+\begin{tabular}{|l|p{3.8cm}|c|p{4cm}|}
+\hline
+\textbf{Scaling Type} & \textbf{Trigger Condition} & \textbf{Severity} &
+\textbf{Remediation Action} \\
+\hline
+Horizontal & HTTP 5xx error rate $> 1\%$      & Warning  & Spawn new VM in mini-cluster \\
+\hline
+Horizontal & HTTP 5xx error rate $> 5\%$      & Critical & Spawn new VM immediately \\
+\hline
+Horizontal & Network packet loss $> 2\%$      & Critical & Spawn new VM, rebalance pool \\
+\hline
+Vertical   & CPU utilisation $> 80\%$         & Warning  & $+1$ vCPU allocated \\
+\hline
+Vertical   & CPU utilisation $> 95\%$         & Critical & $+1$ vCPU, migrate if no headroom \\
+\hline
+Vertical   & RAM utilisation $> 60\%$         & Warning  & $+20\%$ memory allocated \\
+\hline
+Vertical   & RAM utilisation $> 80\%$         & Critical & $+20\%$ memory, migrate if needed \\
+\hline
+Vertical   & Free disk I/O capacity $< 20\%$  & Warning/Critical & $+15$\,GB storage provisioned \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Container Scheduling and Placement}
+
+Each application service runs as a container, with every container handling exactly one microservice
+and relying on standard kernel mechanisms --- namespaces and control groups --- for isolation from
+neighbouring workloads. Containers are assigned to VMs using a Best Fit strategy: for each
+container to be placed, the scheduler picks the VM with the least remaining capacity that can still
+meet the container's resource requirements. This fills VMs to high utilisation before touching
+less-loaded ones, which keeps the total number of active VMs --- and therefore energy and licensing
+costs --- as low as possible \cite{beloglazov2012optimal}.
+
+Mini-cluster boundaries are respected throughout scheduling: containers from services in the same
+mini-cluster are placed on VMs in that same mini-cluster whenever possible, preserving the network
+locality that the partitioning was designed to create. When a horizontal scaling event adds a new
+VM, its containers are placed using the same Best Fit rule, and the new VM is registered in the
+same mini-cluster as the VM it was created from, keeping the cluster topology consistent.
+
+\subsection{Observability and Automated Response}
+
+The monitoring layer gives full visibility into all three operational layers below it. It consists
+of two modules that work together: the telemetry collection subsystem and the alert manager.
+
+The telemetry subsystem collects metrics continuously from every component in the cluster: physical
+servers (CPU usage, memory, disk I/O, and energy per node), virtual machines (CPU steal time,
+working-set size, and container runtime data), physical network devices (port usage, packet loss,
+routing state), and virtual network devices (software-defined switch throughput and inter-VM
+traffic). Data is collected using a pull-based model where a central aggregator polls agents on each
+node at regular intervals --- a well-known approach that scales better than push-based alternatives
+in large deployments \cite{turnbull2018monitoring}. Stored streams use time-windowed retention:
+full resolution is kept during anomalous periods, and data from normal operation is progressively
+downsampled. Metrics from co-located resources are stored together, which enables anomaly detection
+based on correlation breaks rather than on individual threshold crossings alone.
+
+The alert manager turns observations into actions. When the telemetry subsystem sends a structured
+event --- describing the affected resource, its measured value, and its severity --- the alert
+manager checks it against its rule base and picks the right response: either a scaling action
+directed at the virtualisation layer, or a notification sent to the operator interface for
+situations that need human review. To avoid alert storms during cascading failures, the alert
+manager groups related events into one actionable signal and suppresses follow-on alerts when a
+root-cause alert for the same component is already active.
+
+The monitoring layer described above provides the observability the cluster needs. However,
+monitoring alone is not enough at scale. Fixed alert thresholds stop being meaningful as traffic
+patterns change; a flood of simultaneous alerts during an incident makes it hard to separate root
+causes from symptoms; and some remediation actions carry enough risk that they should not be
+executed automatically without proper validation. The next section describes the intelligent layer
+built to address these gaps.
+
+% -----------------------------------------------------------------------------
+\section{Intelligence and Security}
+
+Running a large cluster at scale goes beyond what static rules and manual oversight can handle
+reliably. Thresholds set for one traffic pattern become wrong when the pattern changes. During a
+live incident, operators facing dozens of alerts at once cannot easily tell which is the root cause
+and which are just symptoms. And some remediation actions carry enough risk that applying them
+without careful validation can make things worse. The architecture tackles these problems through
+three components: a conversational assistant that makes cluster management accessible in plain
+language, a predictive model that forecasts resource pressure and keeps alert thresholds calibrated,
+and an autonomous decision-making system that classifies every action by its risk level before
+executing it. A zero-trust security design protects the full stack, including these AI components.
+
+\subsection{Conversational Administration Assistant}
+
+The most distinctive component in the intelligence layer is a natural-language assistant integrated
+directly into the cluster management interface. Instead of requiring operators to navigate
+dashboards or memorise CLI commands, the assistant lets them interact with the cluster in plain
+language. An administrator can ask which mini-cluster is under the most memory pressure, get a
+timeline of all scaling events from the past six hours, or find out which VMs have exceeded their
+CPU warning threshold more than three times today --- all without touching the underlying APIs or
+time-series databases directly.
+
+The assistant converts each question into a structured query against the telemetry history and
+returns a clear, human-readable answer. Its ability to act on its own is deliberately limited: it
+can read and report information freely, but it cannot change cluster state without explicit operator
+approval. For any action that modifies the cluster --- starting a live migration, adjusting a
+threshold, triggering a scaling event --- the assistant first describes what it intends to do and
+what the expected consequences are, then waits for the operator to confirm before sending any
+command. This keeps human accountability intact while removing the complexity of interacting with
+low-level tools, which matters most when an incident is already in progress.
+
+The assistant also acts as the interface through which the predictive model reaches the operator.
+When the model identifies a risk, it surfaces its recommendation through the assistant in plain
+language, so the operator can approve, defer, or dismiss it without needing to interpret raw
+forecasting output.
+
+\subsection{Predictive Resource Management}
+
+Working alongside the reactive scaling mechanisms in Section~2.3.2, the predictive model aims to
+catch resource problems before any threshold is crossed. This reduces the number of reactive
+scaling events and keeps the cluster more stable. The model works across two time horizons.
+
+Before a VM is created, the model looks at the declared service type, the expected request volume,
+and the resource usage of similar services already running in the cluster. Based on that, it
+suggests an initial resource allocation that fits the incoming workload rather than just picking a
+generic size class. A well-sized VM from the start means fewer early vertical scaling events, which
+reduces the disruption of live migrations right after a new deployment.
+
+Once a VM is running, the model watches its resource usage trends and uses time-series forecasting
+to spot trajectories heading toward a scaling threshold. When it detects one with enough confidence,
+it sends a pre-emptive recommendation through the conversational assistant, showing the operator
+the projected trend, the suggested action, and its expected effect on usage and cost. The operator
+can then approve the action --- at which point the assistant sends the provisioning request --- or
+dismiss it, with the dismissal recorded in the audit log. This keeps the machine learning model's
+pattern-recognition strengths in play while leaving all resource changes under human control.
+
+The predictive model also addresses a known limitation of fixed thresholds. The default values in
+Table~\ref{tab:scaling} --- 80\% CPU, 60\% RAM, and so on --- work well under typical load, but
+they become either too sensitive or too lenient as the application's normal behaviour changes over
+time. The model therefore recalibrates the warning and critical threshold values continuously,
+using the cluster's recent telemetry as a learned baseline. During a planned batch run or a
+high-traffic event, it raises thresholds to cut down on false-positive alerts. When the cluster is
+unusually quiet, it tightens them to catch anomalies sooner. The result is an alert system that
+stays meaningful across all normal operating conditions.
+
+\subsection{Autonomous Decision-Making and Risk-Based Escalation}
+
+The predictive model handles threshold calibration and pre-emptive recommendations, but executing
+remediation actions --- especially those triggered by live anomalies --- requires more than a rule
+engine can provide. This is handled by a two-agent system with a clear separation of
+responsibilities between a Planner and a Critic.
+
+The Planner continuously reads the cluster's telemetry, the predictive model's bottleneck signals,
+and the history of past scaling decisions. When it detects an anomaly or sustained resource
+pressure that needs action, it identifies a concrete response --- for example, scaling a service
+horizontally, resizing a VM vertically, or initiating a live migration --- and assigns the proposed
+action an initial risk level based on how reversible it is, how wide its scope is, and how much it
+could disrupt running services.
+
+The Critic acts as an independent safety check. It receives the Planner's proposal and evaluates
+it against three conditions before letting it proceed: it checks that the target physical host has
+enough free capacity to absorb the change without overloading; it scans the recent action log for
+duplicates or signs of a runaway loop; and it confirms that the proposed action targets the same
+bottleneck dimension the predictive model identified, so the response actually matches the problem.
+The Critic can approve the action, reject it and suggest an alternative, or raise its risk level if
+the analysis reveals something the Planner missed.
+
+What happens next depends on the risk level assigned after the Critic's review.
+Table~\ref{tab:escalation} summarises the three levels and the role of the conversational assistant
+at each one.
+
+\begin{table}[h]
+\centering
+\caption{Risk-Based Escalation Matrix}
+\label{tab:escalation}
+\begin{tabular}{|l|p{3cm}|p{4cm}|p{4.5cm}|}
+\hline
+\textbf{Risk Level} & \textbf{Example Actions} & \textbf{System Response} &
+\textbf{Human Role} \\
+\hline
+Low &
+Add resources, clone instance &
+Executed immediately upon Critic approval &
+Informed via audit log; no action required \\
+\hline
+Medium &
+Vertical scaling, standard scale-out, threshold adjustment &
+Executed automatically; Planner logs reasoning and expected outcome &
+Notified via assistant; may review or override within a grace window \\
+\hline
+High &
+VM deletion, forced scale-down, irreversible operations &
+Action suspended; placed in approval queue with full context and rollback strategy &
+Must provide explicit approval via the conversational assistant before any command is issued \\
+\hline
+\end{tabular}
+\end{table}
+
+The escalation matrix is where the three AI components connect into one pipeline. The predictive
+model identifies the bottleneck and adjusts thresholds. The Planner decides on a response and
+assigns a risk level. The Critic checks it. For high-risk actions, the conversational assistant
+brings the proposal to the operator in plain language --- including the Planner's reasoning, the
+Critic's concerns, and a rollback plan --- and waits for an explicit decision before anything is
+executed. This way, routine low-risk operations run automatically without slowing things down,
+while actions that could disrupt the service always go through a human.
+
+\subsection{Security Architecture}
+
+Security is treated as a property of the entire stack, not something added at a single point. The
+guiding principle is defence in depth, built on a zero-trust model: being inside the network does
+not automatically grant trust, every communication must be authenticated, and every component gets
+only the minimum permissions it actually needs \cite{rose2020zero}.
+
+At the network edge, hardware firewalls and managed switches only let through traffic that matches
+declared communication policies --- everything else is blocked before it reaches any internal
+service. Inside the cluster, communication between VMs and containers is controlled by
+microsegmentation rules that default to deny: a service can only talk to the peers it has been
+explicitly authorised to reach. This limits the damage of any breach to the immediate area of the
+affected workload and prevents it from spreading across the cluster.
+
+Every entity in the cluster --- physical nodes, VMs, containers, and user accounts --- has a
+unique, cryptographically verifiable identity. All communication between components requires mutual
+authentication, so neither side can impersonate the other. Credentials are short-lived and rotated
+regularly, which keeps the exposure window small if a credential is ever compromised.
+
+The telemetry subsystem also works as a security sensor. Unusual patterns in traffic, API call
+rates, or resource usage are flagged as potential security events and routed through the same alert
+manager used for operational incidents, so security issues get the same prompt attention as
+performance problems. Every security-relevant action --- login attempts, privilege changes, policy
+updates, and commands issued through the conversational assistant --- is written to an append-only
+audit log that supports post-incident analysis and regulatory compliance \cite{scarfone2008guide}.
+
+% -----------------------------------------------------------------------------
+\section{Conclusion}
+
+The architecture designed in this chapter is based on the idea that cost efficiency and continuous
+availability do not have to be in conflict --- intelligent automation can satisfy both at the same
+time. The four infrastructure layers --- physical, virtualisation, containerisation, and monitoring
+--- form a self-regulating stack where each layer builds on the one below it and provides
+
+higher-level services to the layer above.
+
+The hybrid WOA--DE provisioning algorithm places VMs onto physical hosts with minimal resource
+mismatch while keeping enough population diversity to avoid local optima. The Best Fit container
+scheduler maximises VM utilisation within those placements. The reactive scaling mechanisms keep
+service capacity matched to demand as it changes. And the predictive model reduces how often
+reactive scaling is needed by anticipating problems before they become critical.
+
+Three things set this architecture apart. First, the conversational assistant makes cluster
+management accessible to operators who are not infrastructure specialists, and serves as the
+approval interface for high-risk autonomous actions. Second, the combined predictive and autonomous
+decision-making system lets the cluster adapt smoothly to changing demand --- anticipating pressure,
+recalibrating thresholds, and executing low-risk fixes automatically while escalating anything
+consequential to a human through a structured risk matrix. Third, the zero-trust security design
+ensures that the AI layer itself cannot be used as an attack vector: the Planner and Critic submit
+structured proposals to a central orchestrator that validates the execution context independently,
+all credentials are short-lived, and every decision --- whether made by a human or by the system
+--- is recorded in an immutable audit log.
+
+Chapter 3 moves from design to implementation, covering the technology choices, configuration
+details, and deployment steps that turn this architecture into a working, operational cluster.
+
+\end{document}
