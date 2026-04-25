@@ -1,9 +1,10 @@
 \documentclass[12pt,a4paper]{report}
 
-% Packages
-% \usepackage[utf8]{inputenc} % Removed: Conflicts with XeLaTeX
-% \usepackage[T1]{fontenc}    % Removed: Conflicts with XeLaTeX
-\usepackage{fontspec}         % Added: Native font handling for XeLaTeX
+% ============================================================
+% PREAMBLE  –  compile with: xelatex thesis.tex
+% ============================================================
+
+\usepackage{fontspec}         % Native font handling for XeLaTeX
 \usepackage{geometry}
 \usepackage{graphicx}
 \usepackage{fancyhdr}
@@ -14,17 +15,27 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{array}
+\usepackage{booktabs}         % Professional horizontal table rules
+%\usepackage{parskip}          % Space between paragraphs instead of indent
+\usepackage{microtype}        % Micro-typographic improvements
 
-% Package for Arabic script (replaces babel — the two are incompatible)
+% ----- THE TWO PACKAGES THAT WERE MISSING AND CAUSED ALL FLOAT ISSUES -----
+\usepackage{float}            % REQUIRED for [H] – forces figure/table exactly here
+\usepackage{placeins}         % REQUIRED for \FloatBarrier – hard section boundary
+% --------------------------------------------------------------------------
+
+% Arabic support (polyglossia replaces babel; the two are incompatible)
 \usepackage{polyglossia}
 \setmainlanguage{english}
 \setotherlanguage{arabic}
 \newfontfamily\arabicfont[Script=Arabic]{Amiri}
 
-% hyperref must be loaded last
+% hyperref MUST be loaded last
 \usepackage{hyperref}
 
-% Page geometry for the whole document
+% ------------------------------------------------------------
+% Page geometry
+% ------------------------------------------------------------
 \geometry{
     left=3cm,
     right=2.5cm,
@@ -32,10 +43,14 @@
     bottom=2.5cm
 }
 
+% ------------------------------------------------------------
 % Line spacing
+% ------------------------------------------------------------
 \onehalfspacing
 
+% ------------------------------------------------------------
 % Header and footer
+% ------------------------------------------------------------
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\leftmark}
@@ -43,12 +58,16 @@
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0pt}
 
+% ------------------------------------------------------------
 % Chapter and section formatting
+% ------------------------------------------------------------
 \titleformat{\chapter}[display]
-{\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+  {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
 \titlespacing*{\chapter}{0pt}{-20pt}{40pt}
 
+% ------------------------------------------------------------
 % Hyperref setup
+% ------------------------------------------------------------
 \hypersetup{
     colorlinks=true,
     linkcolor=black,
@@ -58,9 +77,13 @@
     pdfauthor={Your Name}
 }
 
+% ============================================================
 \begin{document}
+% ============================================================
 
-% Title Page - ULTRA COMPACT VERSION
+% ============================================================
+% TITLE PAGE
+% ============================================================
 \newgeometry{left=2.5cm, right=2.5cm, top=1.5cm, bottom=1.5cm} % Temporary smaller margins for title page
 \begin{titlepage}
 \thispagestyle{empty}
@@ -157,14 +180,13 @@ Mr. Zeraoulia Khaled
 {\normalsize Code PFE : ISIL-67}
 
 \end{titlepage}
-\restoregeometry % Restore original margins for the rest of the document
+\restoregeometry
 
-%=============================================================
-% FRONT MATTER — Roman numeral page numbering (i, ii, iii, ...)
-%=============================================================
+% ============================================================
+% FRONT MATTER  –  Roman numeral page numbering
+% ============================================================
 \pagenumbering{roman}
 
-% Dedication (Optional)
 \newpage
 \chapter*{Dedication}
 \addcontentsline{toc}{chapter}{Dedication}
@@ -173,172 +195,252 @@ Mr. Zeraoulia Khaled
 \begin{center}
     \textit{To be implemented.}
 \end{center}
-\newpage
 
-% Acknowledgements
+\newpage
 \chapter*{Acknowledgements}
 \addcontentsline{toc}{chapter}{Acknowledgements}
-
 To be implemented
 
 \newpage
-
-% Abstract
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
-
 To be implemented
 
 \textbf{Keywords:} To be implemented
 
 \newpage
-
-% Table of Contents
 \tableofcontents
-\newpage
 
-% List of Figures
+\newpage
 \listoffigures
 \addcontentsline{toc}{chapter}{List of Figures}
-\newpage
 
-% List of Tables
+\newpage
 \listoftables
 \addcontentsline{toc}{chapter}{List of Tables}
-\newpage
 
-% List of Abbreviations
+\newpage
 \chapter*{List of Abbreviations}
 \addcontentsline{toc}{chapter}{List of Abbreviations}
-
 \begin{tabbing}
 \hspace{3cm} \= \kill
-\textbf{API} \> Application Programming Interface \\
+\textbf{API}   \> Application Programming Interface \\
 \textbf{CI/CD} \> Continuous Integration/Continuous Deployment \\
-\textbf{CPU} \> Central Processing Unit \\
-\textbf{DevOps} \> Development and Operations \\
-\textbf{HTTP} \> Hypertext Transfer Protocol \\
-\textbf{IT} \> Information Technology \\
-\textbf{OS} \> Operating System \\
-\textbf{REST} \> Representational State Transfer \\
-\textbf{SaaS} \> Software as a Service \\
-\textbf{VM} \> Virtual Machine \\
-\textbf{VPN} \> Virtual Private Network \\
+\textbf{CPU}   \> Central Processing Unit \\
+\textbf{DE}    \> Differential Evolution \\
+\textbf{DevOps}\> Development and Operations \\
+\textbf{HTTP}  \> Hypertext Transfer Protocol \\
+\textbf{IT}    \> Information Technology \\
+\textbf{OS}    \> Operating System \\
+\textbf{REST}  \> Representational State Transfer \\
+\textbf{SaaS}  \> Software as a Service \\
+\textbf{VM}    \> Virtual Machine \\
+\textbf{VPN}   \> Virtual Private Network \\
+\textbf{WOA}   \> Whale Optimisation Algorithm \\
 \end{tabbing}
 
 \newpage
-
-% General Introduction
 \chapter*{General Introduction}
 \addcontentsline{toc}{chapter}{General Introduction}
-
-to be implemented
+To be implemented
 \newpage
 
-%=============================================================
-% MAIN MATTER — Arabic numeral page numbering, restarting at 1
-%=============================================================
+% ============================================================
+% MAIN MATTER  –  Arabic numeral page numbering from 1
+% ============================================================
 \pagenumbering{arabic}
 \setcounter{page}{1}
 
-% Chapter 1
+% ============================================================
+% CHAPTER 1 – Theoretical Foundation and Architectural Paradigms
+% ============================================================
 \chapter{Theoretical Foundation and Architectural Paradigms}
+\label{chap:theory}
 
 \section{Introduction}
 
-Modern software development has been shaped by evolving scalability demands and the need for efficient resource utilization. Virtualization and containerization have fundamentally altered how applications are developed, deployed, and managed. This chapter establishes the theoretical foundation for these paradigm shifts, covering their core concepts, operational characteristics, and relationship to microservices architecture, before critically examining whether organizations face a genuine imperative to adopt them.
+Modern software development has been shaped by evolving scalability demands and the
+need for efficient resource utilization. Virtualization and containerization have
+fundamentally altered how applications are developed, deployed, and managed. This
+chapter establishes the theoretical foundation for these paradigm shifts, covering
+their core concepts, operational characteristics, and relationship to microservices
+architecture, before critically examining whether organizations face a genuine
+imperative to adopt them.
 
+% ================================================================
 \section{Virtualization and Containerization}
+% ================================================================
 
 \subsection{Virtualization}
 
-Virtualization enables the creation of simulated computing environments abstracted from physical hardware. A hypervisor partitions physical resources into isolated virtual machines (VMs), each with its own allocated CPU, memory, storage, and network interfaces \cite{popek1974formal}. By decoupling software execution from hardware, multiple operating systems can coexist on a single server while remaining operationally independent \cite{rosenblum2005virtual}.
+Virtualization enables the creation of simulated computing environments abstracted
+from physical hardware. A hypervisor partitions physical resources into isolated
+virtual machines (VMs), each with its own allocated CPU, memory, storage, and
+network interfaces \cite{popek1974formal}. By decoupling software execution from
+hardware, multiple operating systems can coexist on a single server while remaining
+operationally independent \cite{rosenblum2005virtual}.
 
-Key advantages include resource consolidation, reduced infrastructure costs, live migration of running VMs between hosts, rapid provisioning of environments, and flexible workload placement \cite{vmware2006consolidation, barham2003xen}.
+Key advantages include resource consolidation, reduced infrastructure costs, live
+migration of running VMs between hosts, rapid provisioning of environments, and
+flexible workload placement \cite{vmware2006consolidation, barham2003xen}.
 
-\begin{figure}[h]
+% Figure 1.1 – placed directly after the paragraph describing virtualisation.
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.75\textwidth]{graphics/vm_architecture.png}
     \caption{Virtual Machine Architecture Overview}
     \label{fig:vm_architecture}
 \end{figure}
+\FloatBarrier
 
 \subsection{Containerization}
 
-Containerization is a lightweight alternative that operates at the operating-system level rather than the hardware level. Containers encapsulate application code with its dependencies into portable units that share the host OS kernel, using kernel features such as \textit{namespaces} for isolation and \textit{control groups} for resource limiting \cite{merkel2014docker, soltesz2007container}.
+Containerization is a lightweight alternative that operates at the operating-system
+level rather than the hardware level. Containers encapsulate application code with
+its dependencies into portable units that share the host OS kernel, using kernel
+features such as \textit{namespaces} for isolation and \textit{control groups} for
+resource limiting \cite{merkel2014docker, soltesz2007container}.
 
-Key advantages include faster startup times, higher deployment density, consistent behavior across environments, natural alignment with microservices and CI/CD pipelines, and declarative version-controlled definitions that simplify rollbacks \cite{bernstein2014containers, pahl2015containerization}.
+Key advantages include faster startup times, higher deployment density, consistent
+behavior across environments, natural alignment with microservices and CI/CD
+pipelines, and declarative version-controlled definitions that simplify rollbacks
+\cite{bernstein2014containers, pahl2015containerization}.
 
+\FloatBarrier
 
+% ================================================================
 \section{Virtualized and Containerized Environments}
+% ================================================================
 
 \subsection{Virtual Machine Architecture}
 
-Hypervisors come in two types: Type~1 (bare-metal) run directly on hardware, while Type~2 run atop a host OS \cite{rosenblum2005virtual}. Each VM includes a full guest OS and virtualized hardware managed by the hypervisor, providing strong isolation at the cost of higher resource overhead and longer boot times \cite{barham2003xen}.
-
-
+Hypervisors come in two types: Type~1 (bare-metal) run directly on hardware, while
+Type~2 run atop a host OS \cite{rosenblum2005virtual}. Each VM includes a full
+guest OS and virtualized hardware managed by the hypervisor, providing strong
+isolation at the cost of higher resource overhead and longer boot times
+\cite{barham2003xen}.
 
 \subsection{Container-Based Environments}
 
-Container runtimes such as Docker or containerd interface with the host kernel to create isolated execution contexts. Namespaces prevent containers from observing processes outside their scope; control groups prevent resource monopolization; and union file systems allow containers to share common base layers while maintaining isolated writable layers \cite{merkel2014docker, soltesz2007container}.
+Container runtimes such as Docker or containerd interface with the host kernel to
+create isolated execution contexts. Namespaces prevent containers from observing
+processes outside their scope; control groups prevent resource monopolization; and
+union file systems allow containers to share common base layers while maintaining
+isolated writable layers \cite{merkel2014docker, soltesz2007container}.
 
+Container orchestration platforms such as Kubernetes add automated scheduling,
+service discovery, health monitoring, and rolling updates to manage containers at
+scale \cite{burns2016borg}.
 
-
-Container orchestration platforms such as Kubernetes add automated scheduling, service discovery, health monitoring, and rolling updates to manage containers at scale \cite{burns2016borg}.
-\begin{figure}[h]
+% Figure 1.2 – placed directly after the container-based environments description,
+% pinned here by [H] + \FloatBarrier so it cannot drift into later sections.
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.75\textwidth]{graphics/container_environment.png}
     \caption{Container-Based Environment and Components}
     \label{fig:container_environment}
 \end{figure}
+\FloatBarrier
 
+% ================================================================
 \section{Microservices Architecture}
+% ================================================================
 
 \subsection{Definition and Principles}
 
-Microservices structures applications as collections of loosely coupled, independently deployable services, each implementing a specific business capability and owning its own data store \cite{newman2015microservices}. Core principles include single responsibility, bounded contexts from domain-driven design, lightweight communication via HTTP APIs or message queues, decentralized governance, and built-in resilience patterns such as circuit breakers and timeouts \cite{fowler2014microservices, richardson2018microservices}.
+Microservices structures applications as collections of loosely coupled,
+independently deployable services, each implementing a specific business capability
+and owning its own data store \cite{newman2015microservices}. Core principles
+include single responsibility, bounded contexts from domain-driven design,
+lightweight communication via HTTP APIs or message queues, decentralized governance,
+and built-in resilience patterns such as circuit breakers and timeouts
+\cite{fowler2014microservices, richardson2018microservices}.
 
 \subsection{Benefits and Challenges}
 
-Microservices enable independent deployability, technology heterogeneity, granular scalability, team autonomy, and incremental modernization of legacy systems \cite{newman2015microservices, fowler2014microservices}.
+Microservices enable independent deployability, technology heterogeneity, granular
+scalability, team autonomy, and incremental modernization of legacy systems
+\cite{newman2015microservices, fowler2014microservices}.
 
-However, they introduce significant complexity: distributed debugging requires sophisticated monitoring and tracing; cross-service transactions demand eventual consistency models; network latency introduces new failure points; and substantial operational infrastructure---service discovery, load balancing, orchestration---becomes necessary \cite{richardson2018microservices}.
+However, they introduce significant complexity: distributed debugging requires
+sophisticated monitoring and tracing; cross-service transactions demand eventual
+consistency models; network latency introduces new failure points; and substantial
+operational infrastructure --- service discovery, load balancing, orchestration ---
+becomes necessary \cite{richardson2018microservices}.
 
+% ================================================================
 \section{Microservices versus Monolithic Architecture}
+% ================================================================
 
-Monolithic architecture integrates all components---UI, business logic, and data access---into a single codebase sharing a common database, deployed as one unit \cite{fowler2014microservices}. Components communicate through in-process calls, simplifying initial development and ensuring strong data consistency.
+Monolithic architecture integrates all components --- UI, business logic, and data
+access --- into a single codebase sharing a common database, deployed as one unit
+\cite{fowler2014microservices}. Components communicate through in-process calls,
+simplifying initial development and ensuring strong data consistency.
 
-The key structural differences are summarized as follows. Monoliths exhibit tight coupling where changes ripple across the codebase, while microservices enforce loose coupling through stable interfaces. Monoliths use a shared database with strong consistency; microservices use per-service databases, complicating cross-service transactions. Monoliths scale by replicating the entire application; microservices enable selective scaling of individual components. Failures in a monolith can cascade system-wide, whereas microservices contain failures within service boundaries---though distributed failures introduce new failure modes \cite{newman2015microservices, richardson2018microservices, fowler2014microservices}.
+The key structural differences are summarized as follows. Monoliths exhibit tight
+coupling where changes ripple across the codebase, while microservices enforce loose
+coupling through stable interfaces. Monoliths use a shared database with strong
+consistency; microservices use per-service databases, complicating cross-service
+transactions. Monoliths scale by replicating the entire application; microservices
+enable selective scaling of individual components. Failures in a monolith can
+cascade system-wide, whereas microservices contain failures within service
+boundaries --- though distributed failures introduce new failure modes
+\cite{newman2015microservices, richardson2018microservices, fowler2014microservices}.
 
-\section{Critical Analysis: The Imperative for Microservices with Containerization and Virtualization}
+% ================================================================
+\section{Critical Analysis: The Imperative for Microservices with Containerization
+and Virtualization}
+% ================================================================
 
 \subsection{Limitations of Traditional Deployment}
 
-Traditional deployment on physical or dedicated virtual servers suffers from documented inefficiencies. Infrastructure often operates below 20--30 percent average utilization while being over-provisioned for peak loads, representing substantial capital waste \cite{vmware2006consolidation}. Manual provisioning is slow and inconsistent, limiting organizational responsiveness. Environmental discrepancies between development and production cause deployment failures \cite{merkel2014docker}, and monolithic architectures offer limited fault tolerance \cite{rosenblum2005virtual}.
+Traditional deployment on physical or dedicated virtual servers suffers from
+documented inefficiencies. Infrastructure often operates below 20--30 percent
+average utilization while being over-provisioned for peak loads, representing
+substantial capital waste \cite{vmware2006consolidation}. Manual provisioning is
+slow and inconsistent, limiting organizational responsiveness. Environmental
+discrepancies between development and production cause deployment failures
+\cite{merkel2014docker}, and monolithic architectures offer limited fault tolerance
+\cite{rosenblum2005virtual}.
 
-\subsection{Should Organizations Transition to Microservices and Virtualization/Containerization Environments?}
+\subsection{Should Organizations Transition to Microservices and
+Virtualization/Containerization Environments?}
 
-The strategic question is straightforward to pose but difficult to answer: \textit{should organizations transition to microservices supported by virtualization and containerization?}
+The strategic question is straightforward to pose but difficult to answer:
+\textit{should organizations transition to microservices supported by virtualization
+and containerization?}
 
-The case for transition is clear in principle. Containerization delivers consistency and resource efficiency; virtualization enables consolidation; microservices unlock deployment velocity and team autonomy \cite{merkel2014docker, richardson2018microservices}. Yet the associated costs are substantial. Container orchestration demands specialized expertise, migration requires significant investment in infrastructure and personnel, and the operational maturity required for distributed microservices exceeds what most organizations have built through traditional models \cite{burns2016borg, bernstein2014containers}.
+The case for transition is clear in principle. Containerization delivers consistency
+and resource efficiency; virtualization enables consolidation; microservices unlock
+deployment velocity and team autonomy \cite{merkel2014docker, richardson2018microservices}.
+Yet the associated costs are substantial. Container orchestration demands specialized
+expertise, migration requires significant investment in infrastructure and personnel,
+and the operational maturity required for distributed microservices exceeds what most
+organizations have built through traditional models \cite{burns2016borg, bernstein2014containers}.
 
-The decision is further complicated by inherent contradictions: larger organizations may benefit most from consolidation yet face more complex migrations; stable legacy systems may gain little from disruption; and containerization without architectural transformation yields limited benefits, while microservices without containerization introduce different operational burdens. Organizations must determine not only \textit{whether} to adopt these technologies but \textit{in what sequence and scope}---questions for which industry guidance remains conflicting and empirical evidence limited \cite{barham2003xen}.
+The decision is further complicated by inherent contradictions: larger organizations
+may benefit most from consolidation yet face more complex migrations; stable legacy
+systems may gain little from disruption; and containerization without architectural
+transformation yields limited benefits, while microservices without containerization
+introduce different operational burdens. Organizations must determine not only
+\textit{whether} to adopt these technologies but \textit{in what sequence and scope}
+--- questions for which industry guidance remains conflicting and empirical evidence
+limited \cite{barham2003xen}.
 
-\bibliographystyle{plain}
+\FloatBarrier
 
 % ============================================================
-% CHAPTER 2
+% CHAPTER 2 – Conception and Architectural Design
 % ============================================================
-
 % ============================================================
 % CHAPTER 2 – Conception and Architectural Design
 % ============================================================
 \chapter{Conception and Architectural Design}
 \label{chap:conception}
- 
+
 \section{Introduction}
 \label{sec:ch2_intro}
- 
+
 This chapter presents the full architectural design of a cluster infrastructure for
 a high-demand web application, organised around three pillars: a proof of concept
 defining clear validation criteria before any large-scale deployment, a four-layer
@@ -395,11 +497,8 @@ containers across those VMs. The monitoring layer observes all three and drives
 automated responses. Figure~\ref{fig:layers} illustrates this stack and the data
 flows between layers.
 
-% ----------------------------------------------------------------
-% Figure 2.1 – placed AFTER the section intro paragraph that
-% references it, BEFORE subsection 2.3.1.  \FloatBarrier after the
-% figure pins it here and prevents it drifting into 2.3.1.
-% ----------------------------------------------------------------
+% Figure 2.1 – pinned immediately after the section intro paragraph that references it.
+% \FloatBarrier stops it from drifting into subsection 2.3.1.
 \begin{figure}[H]
     \centering
     \vspace{4pt}
@@ -410,7 +509,7 @@ flows between layers.
     \label{fig:layers}
     \vspace{4pt}
 \end{figure}
-\FloatBarrier   % hard stop – nothing above this line leaks past here
+\FloatBarrier
 
 % ----------------------------------------------------------------
 \subsection{Physical and Network Foundation}
@@ -434,6 +533,9 @@ redundant pairs \cite{barroso2013datacenter}.
 \paragraph{Initial Sizing and Mini-Cluster Organisation.}
 Each new VM receives an initial resource allocation derived from a workload profile
 --- benchmarks, service-level objectives, or historical data from similar services.
+A set of standard \textbf{size classes} is defined on top of this baseline, providing
+pre-validated resource ratios for the most common workload types and simplifying
+provisioning decisions for well-characterised services.
 The monitoring layer tracks usage continuously and triggers vertical scaling if
 sustained demand exceeds the initial allocation.
 
@@ -445,11 +547,8 @@ Figure~\ref{fig:mini_clusters} illustrates the partitioning. The value of $k$ is
 either set statically by the application designer, or inferred dynamically by a
 machine learning model observing inter-service communication at runtime.
 
-% ----------------------------------------------------------------
-% Figure 2.2 – placed immediately after the paragraph that
-% describes mini-clusters and references it; \FloatBarrier keeps
-% it above the "Provisioning Algorithm" paragraph.
-% ----------------------------------------------------------------
+% Figure 2.2 – pinned after the mini-cluster paragraph that references it.
+% \FloatBarrier keeps it above the Provisioning Algorithm paragraph.
 \begin{figure}[H]
     \centering
     \vspace{4pt}
@@ -491,10 +590,6 @@ and combined into a weighted Euclidean distance:
 where $\Delta X$ is the gap between what the VM requests and what the host offers.
 A lower score indicates a better placement.
 
-% ----------------------------------------------------------------
-% TABLE 2.1  –  Fitness dimensions
-% Pure \hline + | borders: fully enclosed box, no booktabs mix.
-% ----------------------------------------------------------------
 \begin{table}[H]
     \centering
     \caption{Fitness Function Resource Dimensions}
@@ -562,10 +657,11 @@ $CR{=}0.5$.
 
 \textit{Output}: $X^*$ --- the recommended VM-to-host placement for the mini-cluster.
 
+% Figure 2.3 – pinned after the algorithm description, before the scaling paragraph.
 \begin{figure}[H]
     \centering
     \vspace{4pt}
-    \includegraphics[width=\textwidth]{VMProvisioning.pdf}
+    \includegraphics[width=\textwidth]{VM-Provisioning.pdf}
     \caption{Hybrid WOA--DE provisioning algorithm (swimlane view). Left: WOA
     update phase. Right: DE mutation, crossover, and selection. Centre: shared
     $X^*$ synchronisation.}
@@ -574,6 +670,30 @@ $CR{=}0.5$.
 \end{figure}
 \FloatBarrier
 
+% --- NEW: Algorithm properties and limitations ---
+The hybrid design exhibits five desirable properties.
+(i)~\textbf{Dual exploration:} WOA spiral and random-agent modes explore the
+solution space from directions anchored to $X^*$ and to random population members,
+while DE mutation explores directions defined by the algebraic difference
+$X_{r_1}-X_{r_2}$; the two mechanisms are geometrically independent.
+(ii)~\textbf{Preservation of the global best:} both WOA contraction and DE
+base-vector choice orient the population toward $X^*$, which is refreshed after
+each phase so that improvements found during the WOA phase immediately influence
+the DE phase.
+(iii)~\textbf{Greedy selection:} DE discards any trial mapping that does not
+improve upon its parent, ensuring monotonically non-increasing population fitness
+across iterations.
+(iv)~\textbf{Parameter sensitivity reduction:} mixing both paradigms distributes
+the optimisation workload across two parameter sets whose failure modes are
+uncorrelated.
+(v)~\textbf{Suitability for discrete placement spaces:} the fitness function
+handles the required continuous-to-discrete decoding, so both update rules apply
+without modification.
+The principal limitations are the O($n$) fitness evaluations per iteration, which
+becomes significant at large fleet sizes, and the discrete decoding step required
+before each evaluation.
+% --- END NEW ---
+
 \paragraph{Runtime Scaling Mechanisms.}
 \textbf{Horizontal scaling} creates a new VM in the same mini-cluster when request
 volume exceeds what a single instance can handle. \textbf{Vertical scaling} adds
@@ -581,10 +701,6 @@ vCPUs, memory, or storage when a specific resource is saturated; if the host lac
 headroom, the VM is live-migrated within the mini-cluster \cite{lai2025energy}.
 All trigger conditions and actions are listed in Table~\ref{tab:scaling}.
 
-% ----------------------------------------------------------------
-% TABLE 2.2  –  Scaling triggers
-% Pure \hline + | borders: fully enclosed, each row separated.
-% ----------------------------------------------------------------
 \begin{table}[H]
     \centering
     \caption{Scaling Trigger Conditions and Remediation Actions}
@@ -614,14 +730,18 @@ All trigger conditions and actions are listed in Table~\ref{tab:scaling}.
 \end{table}
 
 \paragraph{Virtual Network Architecture.}
-An overlay network decouples logical topology from physical cabling. Three logical
-segments are defined: primary tenant workloads, a second isolated environment
-(e.g.\ staging), and a dedicated monitoring segment. All inter-segment traffic routes
-through a central virtual router enforcing \textit{default-deny}: unmatched packets
-are silently dropped and cross-segment flows require explicit bidirectional rules.
-The monitoring segment has targeted read-only access to other segments; no reverse
-flow is permitted. An internal name-resolution service eliminates reliance on external
-public resolvers, removing the DNS-redirection risk.
+An overlay network decouples logical topology from physical cabling, enforcing
+segment boundaries in software on each hypervisor node without reconfiguring
+physical equipment. This approach provides greater flexibility and portability than
+VLAN-based segmentation, and is particularly suited to environments where the
+underlying infrastructure cannot be modified.
+Three logical segments are defined: primary tenant workloads, a second isolated
+environment (e.g.\ staging), and a dedicated monitoring segment. All inter-segment
+traffic routes through a central virtual router enforcing \textit{default-deny}:
+unmatched packets are silently dropped and cross-segment flows require explicit
+bidirectional rules. The monitoring segment has targeted read-only access to other
+segments; no reverse flow is permitted. An internal name-resolution service
+eliminates reliance on external public resolvers, removing the DNS-redirection risk.
 
 \FloatBarrier
 
@@ -648,8 +768,19 @@ preserve network locality.
 
 The monitoring layer consists of a \textbf{telemetry subsystem} and an \textbf{alert
 manager}. The telemetry subsystem collects metrics from all layers using a pull-based
-model \cite{nguyen2022loadbalancing}. Co-located metrics are stored together, enabling
-correlation-based anomaly detection rather than isolated threshold crossings.
+model \cite{nguyen2022loadbalancing}, spanning all observable infrastructure
+categories: physical servers (CPU utilisation, memory consumption, disk I/O
+throughput, and energy draw), virtual machines (per-VM CPU steal time and
+working-set size), and physical and virtual network devices (port utilisation,
+packet loss counters, inter-VM traffic volumes).
+% --- NEW: retention and correlation ---
+Data is stored with \textbf{time-windowed retention policies} that preserve
+high-resolution data for anomalous intervals and apply progressive downsampling to
+normal ones. Co-located metrics --- such as the CPU and memory utilisation of all
+VMs sharing the same physical host --- are stored with their correlational
+relationships preserved, enabling \textbf{correlation-based anomaly detection}
+rather than isolated threshold crossings.
+% --- END NEW ---
 
 The alert manager maps structured events to actions: scaling requests to the
 virtualisation layer, or operator notifications for situations requiring human review.
@@ -690,9 +821,25 @@ it recommends an initial resource allocation based on service type, expected loa
 and usage patterns of similar running services, reducing early scaling events.
 \textbf{At runtime (H2)}, it applies time-series forecasting to detect trajectories
 heading toward a scaling threshold and sends pre-emptive recommendations through
-the assistant for operator approval. It also continuously recalibrates the fixed
-thresholds in Table~\ref{tab:scaling} using recent telemetry as a learned baseline,
-raising them during high-traffic events and tightening them during quiet periods.
+the assistant for operator approval.
+% --- NEW: dynamic thresholds, adaptive weights, incremental learning ---
+The model serves three additional functions.
+First, \textbf{dynamic alert thresholds}: rather than relying on the fixed values
+in Table~\ref{tab:scaling}, it continuously recalibrates warning and critical
+thresholds using recent telemetry as a learned baseline, raising them during
+high-traffic events and tightening them during quiet periods to reduce false
+positives.
+Second, \textbf{adaptive fitness weights}: the model continuously identifies the
+current structural bottleneck of the cluster (e.g.\ memory pressure or I/O
+saturation) and dynamically adjusts the weights $w_1$--$w_4$ in
+Equation~\ref{eq:fitness}, so that subsequent placement decisions automatically
+prioritise the constrained resource.
+Third, to remain effective as workloads evolve, the model employs
+\textbf{incremental self-supervised learning}: at regular intervals it ingests the
+latest cluster metrics and updates its internal representations using its own recent
+predictions as soft labels, adapting to new baseline behaviours without requiring
+external ground-truth datasets.
+% --- END NEW ---
 
 % ----------------------------------------------------------------
 \subsection{Autonomous Decision-Making and Risk-Based Escalation}
@@ -707,14 +854,15 @@ absence of runaway loops, and alignment with the predicted bottleneck --- and ma
 approve, reject, or escalate the risk. A critical constraint: the Critic may
 \textit{raise} but is structurally prohibited from \textit{lowering} the Planner's
 risk classification, guarding against adversarial misclassification.
+% --- NEW: orchestration layer isolation ---
+The agents do not hold direct credentials to the infrastructure management
+interfaces; they submit structured proposals to an independent \textbf{orchestration
+layer} that validates the execution context before dispatching commands --- a
+compromised agent can propose but cannot execute unilaterally.
+% --- END NEW ---
 Table~\ref{tab:escalation} shows the routing; Figure~\ref{fig:planner_critic}
-illustrates the full pipeline. Every event is appended to an immutable audit log
-\cite{saxena2022secure}.
+illustrates the full pipeline.
 
-% ----------------------------------------------------------------
-% TABLE 2.3  –  Escalation matrix
-% Pure \hline + | borders.
-% ----------------------------------------------------------------
 \begin{table}[H]
     \centering
     \caption{Risk-Based Escalation Matrix}
@@ -743,6 +891,23 @@ illustrates the full pipeline. Every event is appended to an immutable audit log
     \end{tabular}
 \end{table}
 
+% --- NEW: TTL on approval queue + immutable audit log 3 functions ---
+High-risk actions placed in the approval queue are bounded by a
+\textbf{time-to-live (TTL)}: an action that does not receive administrator
+authorisation within a defined window is automatically rejected and recorded as
+expired, preventing an adversary from poisoning the queue and waiting for accidental
+approval.
+Every event --- Planner proposals, Critic verdicts, execution outcomes, approvals,
+rejections, and TTL expirations --- is appended to an \textbf{immutable audit log}
+\cite{saxena2022secure}. This log serves three security functions: (i)~forensic
+reconstruction of the sequence of events leading to any infrastructure state;
+(ii)~detection of gradual privilege-escalation patterns that would be invisible in
+any single event; and (iii)~permanent accountability for every infrastructure
+change, whether autonomous or human-initiated.
+% --- END NEW ---
+
+% Figure 2.4 – pinned after Table 2.3 and before Security Architecture (2.4.4).
+% Without float+placeins this figure was drifting to page 17, after the conclusion.
 \begin{figure}[H]
     \centering
     \vspace{4pt}
@@ -764,15 +929,28 @@ Security follows \textit{defence in depth} within a \textit{zero-trust} model:
 no entity is trusted by position, every communication is authenticated, and every
 component holds the minimum permissions it needs \cite{saxena2022secure}.
 
-\textbf{Network and segmentation.} Hardware firewalls enforce a perimeter allowlist;
-the three-segment overlay enforces internal microsegmentation so a compromised
-workload cannot move laterally. An anti-DDoS layer absorbs volumetric attacks before
-they reach internal services.
+\textbf{Network and segmentation.} Hardware firewalls enforce a perimeter allowlist
+with bidirectional filtering --- both ingress and egress --- preventing compromised
+internal components from establishing unauthorised outbound channels. The
+three-segment overlay enforces internal microsegmentation so a compromised workload
+cannot move laterally. An anti-DDoS layer absorbs volumetric attacks before they
+reach internal services.
 
 \textbf{Identity and integrity.} Every entity holds a cryptographically verifiable
 identity; all messages carry a digital signature verified before processing.
 Credentials are short-lived and rotated regularly; plaintext channels are prohibited
 even on internal segments.
+
+% --- NEW: runtime anomaly detection as dedicated security component ---
+\textbf{Runtime anomaly detection.} A dedicated security monitoring agent operates
+continuously, subscribing to the same telemetry streams as the alert manager but
+applying a behavioural lens oriented toward deviation rather than resource
+saturation. It evaluates every observable component against static integrity
+baselines and dynamically learned profiles. A \textit{critical} classification
+triggers an immediate alert to the administrator, bypassing all aggregation; a
+\textit{warning} classification is dispatched at a configured periodic interval,
+preserving administrator attention without real-time noise for every minor deviation.
+% --- END NEW ---
 
 \textbf{Patch and supply-chain hygiene.} An automated daily process patches every
 stack layer from hypervisor to auxiliary services. Components are sourced from
@@ -797,17 +975,83 @@ Critic's monotonic risk constraint provides a second structural defence.
 The architecture resolves the efficiency--availability tension through intelligent
 automation at every layer. The hybrid WOA--DE algorithm minimises resource mismatch
 in VM placement; Best Fit scheduling maximises VM utilisation; reactive and predictive
-scaling keep capacity matched to demand; the three-segment overlay enforces tenant
-isolation; and the Planner--Critic pipeline ensures autonomous actions are
-proportionate and auditable. The conversational assistant ties all three intelligent
+scaling --- augmented by adaptive thresholds and dynamic fitness weights --- keep
+capacity matched to demand; the three-segment overlay enforces tenant isolation; and
+the Planner--Critic pipeline ensures autonomous actions are proportionate and
+auditable. The immutable audit log, digital signatures, TTL-bounded approval queue,
+and dedicated security monitoring agent form a coherent defence-in-depth posture
+protecting the entire stack. The conversational assistant ties all three intelligent
 components into a single human-readable interface that keeps operators in control
 without slowing routine operations. Chapter~3 covers the implementation: tool choices,
 configuration, and deployment steps.
 
+% ============================================================
+% UNIFIED BIBLIOGRAPHY
+% ============================================================
 \begin{thebibliography}{99}
 
+% --- Chapter 1 ---
+
+\bibitem{popek1974formal}
+G.~J.~Popek and R.~P.~Goldberg,
+``Formal Requirements for Virtualizable Third Generation Architectures,''
+\textit{Communications of the ACM}, vol.~17, no.~7, pp.~412--421, 1974.
+
+\bibitem{rosenblum2005virtual}
+M.~Rosenblum and T.~Garfinkel,
+``Virtual Machine Monitors: Current Technology and Future Trends,''
+\textit{Computer}, vol.~38, no.~5, pp.~39--47, 2005.
+
+\bibitem{vmware2006consolidation}
+VMware,
+\textit{Server Consolidation and Containment with VMware Infrastructure}.
+VMware White Paper, 2006.
+
+\bibitem{barham2003xen}
+P.~Barham et al.,
+``Xen and the Art of Virtualization,''
+in \textit{Proc. ACM SOSP}, Bolton Landing, NY, 2003, pp.~164--177.
+
+\bibitem{merkel2014docker}
+D.~Merkel,
+``Docker: Lightweight Linux Containers for Consistent Development and Deployment,''
+\textit{Linux Journal}, no.~239, 2014.
+
+\bibitem{soltesz2007container}
+S.~Soltesz et al.,
+``Container-Based Operating System Virtualization: A Scalable, High-Performance
+Alternative to Hypervisors,''
+in \textit{Proc. ACM EuroSys}, Lisbon, 2007, pp.~275--287.
+
+\bibitem{bernstein2014containers}
+D.~Bernstein,
+``Containers and Cloud: From LXC to Docker to Kubernetes,''
+\textit{IEEE Cloud Computing}, vol.~1, no.~3, pp.~81--84, 2014.
+
+\bibitem{pahl2015containerization}
+C.~Pahl,
+``Containerization and the PaaS Cloud,''
+\textit{IEEE Cloud Computing}, vol.~2, no.~3, pp.~24--31, 2015.
+
+\bibitem{burns2016borg}
+B.~Burns, B.~Grant, D.~Oppenheimer, E.~Brewer, and J.~Wilkes,
+``Borg, Omega, and Kubernetes,''
+\textit{ACM Queue}, vol.~14, pp.~70--93, 2016.
+
+\bibitem{fowler2014microservices}
+M.~Fowler and J.~Lewis,
+``Microservices,'' martinfowler.com, Mar.\ 2014.
+[Online]. Available: \url{https://martinfowler.com/articles/microservices.html}
+
+\bibitem{richardson2018microservices}
+C.~Richardson,
+\textit{Microservices Patterns}. Manning Publications, 2018.
+
+% --- Chapter 2 ---
+
 \bibitem{newman2015microservices}
-S.~Newman, \textit{Building Microservices}. O'Reilly Media, 2015.
+S.~Newman,
+\textit{Building Microservices}. O'Reilly Media, 2015.
 
 \bibitem{barroso2013datacenter}
 L.~A.~Barroso, J.~Clidaras, and U.~H\"{o}lzle,
@@ -826,8 +1070,9 @@ S.~Mirjalili and A.~Lewis,
 
 \bibitem{storn1997de}
 R.~Storn and K.~Price,
-``Differential Evolution,''
-\textit{J. Global Optimization}, vol.~11, no.~4, pp.~341--359, 1997.
+``Differential Evolution --- A Simple and Efficient Heuristic for Global
+Optimization over Continuous Spaces,''
+\textit{Journal of Global Optimization}, vol.~11, no.~4, pp.~341--359, 1997.
 
 \bibitem{lai2025energy}
 X.~Lai, X.~Zheng, and W.~Lu,
