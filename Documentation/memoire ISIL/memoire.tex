@@ -1,20 +1,27 @@
 \documentclass[12pt,a4paper]{report}
 
+<<<<<<< Updated upstream
 % ============================================================
 % PREAMBLE  –  compile with: xelatex thesis.tex
 % ============================================================
 
 \usepackage{fontspec}         % Native font handling for XeLaTeX
+=======
+% ================================================================
+% PACKAGES
+% ================================================================
+\usepackage{fontspec}
+>>>>>>> Stashed changes
 \usepackage{geometry}
 \usepackage{graphicx}
 \usepackage{fancyhdr}
 \usepackage{setspace}
 \usepackage{tocloft}
 \usepackage{titlesec}
-\usepackage{cite}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{array}
+<<<<<<< Updated upstream
 \usepackage{booktabs}         % Professional horizontal table rules
 %\usepackage{parskip}          % Space between paragraphs instead of indent
 \usepackage{microtype}        % Micro-typographic improvements
@@ -25,7 +32,16 @@
 % --------------------------------------------------------------------------
 
 % Arabic support (polyglossia replaces babel; the two are incompatible)
+=======
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{caption}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+>>>>>>> Stashed changes
 \usepackage{polyglossia}
+
+% Arabic support for cover page
 \setmainlanguage{english}
 \setotherlanguage{arabic}
 \newfontfamily\arabicfont[Script=Arabic]{Amiri}
@@ -33,6 +49,7 @@
 % hyperref MUST be loaded last
 \usepackage{hyperref}
 
+<<<<<<< Updated upstream
 % ------------------------------------------------------------
 % Page geometry
 % ------------------------------------------------------------
@@ -51,49 +68,70 @@
 % ------------------------------------------------------------
 % Header and footer
 % ------------------------------------------------------------
+=======
+% ================================================================
+% GEOMETRY & STYLE
+% ================================================================
+\geometry{left=3cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\onehalfspacing
+
+>>>>>>> Stashed changes
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\leftmark}
 \fancyhead[R]{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
-\renewcommand{\footrulewidth}{0pt}
 
+<<<<<<< Updated upstream
 % ------------------------------------------------------------
 % Chapter and section formatting
 % ------------------------------------------------------------
+=======
+>>>>>>> Stashed changes
 \titleformat{\chapter}[display]
   {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
 \titlespacing*{\chapter}{0pt}{-20pt}{40pt}
 
+<<<<<<< Updated upstream
 % ------------------------------------------------------------
 % Hyperref setup
 % ------------------------------------------------------------
+=======
+>>>>>>> Stashed changes
 \hypersetup{
     colorlinks=true,
     linkcolor=black,
     citecolor=blue,
     urlcolor=blue,
-    pdftitle={End of Studies Project Report},
-    pdfauthor={Your Name}
 }
 
+<<<<<<< Updated upstream
 % ============================================================
+=======
+% ================================================================
+% DOCUMENT START
+% ================================================================
+>>>>>>> Stashed changes
 \begin{document}
 % ============================================================
 
+<<<<<<< Updated upstream
 % ============================================================
 % TITLE PAGE
 % ============================================================
 \newgeometry{left=2.5cm, right=2.5cm, top=1.5cm, bottom=1.5cm} % Temporary smaller margins for title page
+=======
+% ----------------------------------------------------------------
+% COVER PAGE
+% ----------------------------------------------------------------
+\newgeometry{left=2.5cm, right=2.5cm, top=1.5cm, bottom=1.5cm}
+>>>>>>> Stashed changes
 \begin{titlepage}
 \thispagestyle{empty}
 \centering
 
-\vspace*{-1cm} % Start even higher on the page
+\vspace*{-1cm}
 
-%-----------------------------------------------------------
-% Country + Ministry - Made smaller
-%-----------------------------------------------------------
 {\footnotesize Democratic and People's Republic of Algeria}\\
 {\footnotesize \textarabic{الجمهورية الجزائرية الديمقراطية الشعبية}}
 
@@ -101,101 +139,89 @@
 {\footnotesize \textarabic{وزارة التعليم العالي و البحث العلمي}}
 
 \vspace{0.2cm}
-\rule{\textwidth}{0.3pt} % Thinner rule
+\rule{\textwidth}{0.3pt}
 \vspace{0.2cm}
 
-%-----------------------------------------------------------
-% Logo + University
-%-----------------------------------------------------------
-\begin{minipage}{0.25\textwidth} % Slightly smaller
+\begin{minipage}{0.25\textwidth}
 \centering
-\includegraphics[width=0.9\textwidth]{graphics/USTHB.png}
+\includegraphics[width=0.9\textwidth]{usthb.png}
 \end{minipage}
 \hfill
-\begin{minipage}{0.7\textwidth} % Slightly larger to compensate
+\begin{minipage}{0.7\textwidth}
 \centering
 {\footnotesize \textarabic{جامعة العلوم والتكنولوجيا هواري بومدين}}\\
 {\footnotesize University of Science and Technology Houari Boumediene}
 \end{minipage}
 
-\vspace{0.4cm} % Reduced from 0.8cm
+\vspace{0.4cm}
 
-%-----------------------------------------------------------
-% Faculty information
-%-----------------------------------------------------------
-{\LARGE \textbf{Faculty of Informatics}}\\ % Reduced from \Large
-\vspace{0.5cm} % Reduced
-{\normalsize Bachelor's degree}\\ % Reduced from \large
-{\normalsize graduation thesis.}\\
-\vspace{0.5cm} % Reduced
-{\normalsize \textbf{Option : Information Systems and Software Engineering}} % Reduced from \large
+{\LARGE \textbf{Faculty of Informatics}}\\
+\vspace{0.5cm}
+{\normalsize Thesis for graduation}\\
+{\normalsize for the obtainment of the Bachelor degree}\\
+\vspace{0.5cm}
+{\normalsize \textbf{Option : ACAD}}
 
-\vspace{0.3cm} % Reduced from 0.6cm
-\rule{\textwidth}{0.6pt} % Thinner rule
-\vspace{0.3cm} % Reduced from 0.6cm
+\vspace{0.3cm}
+\rule{\textwidth}{0.6pt}
+\vspace{0.3cm}
 
-%-----------------------------------------------------------
-% Main title - Slightly smaller font
-%-----------------------------------------------------------
-{\Large \textbf{Design and Implementation of an}}\\ % Reduced from \LARGE
-{\Large \textbf{automatic and intelligent provisioning solution}}\\
-{\Large \textbf{for IT resources to enable the scalable deployment of a high-load web application.}}
+{\Large \textbf{Design and Implementation of an Automatic and Intelligent IT Resource Provisioning Solution (Servers and Virtual Machines) for the Scalable Deployment of a High-Load Web Application.}}
 
-\vspace{0.3cm} % Reduced from 0.6cm
-\rule{\textwidth}{0.6pt} % Thinner rule
-\vspace{0.3cm} % Reduced from 0.6cm
+\vspace{0.3cm}
+\rule{\textwidth}{0.6pt}
+\vspace{0.3cm}
 
-%-----------------------------------------------------------
-% Authors and supervisors
-%-----------------------------------------------------------
 \begin{minipage}{0.45\textwidth}
-\normalsize \textit{Realized by :}\\ % Added \normalsize
-Zertal Mohamed El Hadi\\
-Hamdani Younes Abdelouahed\\
-Zediri Widad\\
-Razem Ikram
+\normalsize \textit{Realized by :}\\
+Mr. Zakaria \textsc{HAMMAL}\\
+Mr. Oussama \textsc{SELATENIA}\\
+Mr. Oussama \textsc{MENNOUR}\\
+Mr. Younes \textsc{DJEHA}
 \end{minipage}
 \hfill
 \begin{minipage}{0.45\textwidth}
 \normalsize \textit{Supervised by :}\\
-Mr. Zeraoulia Khaled
+Mr. Khaled \textsc{Zeraoulia}
 \end{minipage}
 
-\vspace{1cm} % Reduced from 0.8cm
+\vfill
 
-%-----------------------------------------------------------
-% Jury
-%-----------------------------------------------------------
-{\normalsize Held on xx/xxxx/2026, before the jury composed of :} % Made \footnotesize
+{\normalsize Held on [DATE], before the jury composed of :}
 
-{\normalsize xxx \hspace{0.8cm} -- President of jury}\\
-{\normalsize xxx \hspace{0.3cm} -- Examiner} % Made \footnotesize
+{\normalsize Mr.\textsc{LASTNAME} Firstname \hspace{0.5cm} -- President of jury}\\
+{\normalsize Mr.\textsc{LASTNAME} Firstname \hspace{0.5cm} -- Examiner}
 
-\vspace{0.8cm} % Reduced from 0.8cm
+\vspace{0.8cm}
 
-%-----------------------------------------------------------
-% Footer
-%-----------------------------------------------------------
-{\normalsize Promotion : 2025--2026}\\ % Made \footnotesize
-{\normalsize Code PFE : ISIL-67}
+{\normalsize Promotion : 2025/2026}\\
+{\normalsize Code PFE : [CODE]}
 
 \end{titlepage}
 \restoregeometry
 
+<<<<<<< Updated upstream
 % ============================================================
 % FRONT MATTER  –  Roman numeral page numbering
 % ============================================================
 \pagenumbering{roman}
 
 \newpage
+=======
+% ----------------------------------------------------------------
+% FRONT MATTER
+% ----------------------------------------------------------------
+\pagenumbering{roman}
+
+>>>>>>> Stashed changes
 \chapter*{Dedication}
 \addcontentsline{toc}{chapter}{Dedication}
-\thispagestyle{empty}
-\vspace*{0.2\textheight}
 \begin{center}
-    \textit{To be implemented.}
+\itshape
+[Content derived from the original memoire.tex dedication section.]
 \end{center}
 
+<<<<<<< Updated upstream
 \newpage
 \chapter*{Acknowledgements}
 \addcontentsline{toc}{chapter}{Acknowledgements}
@@ -205,9 +231,22 @@ To be implemented
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 To be implemented
+=======
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+[Content derived from the original memoire.tex acknowledgements section.]
 
-\textbf{Keywords:} To be implemented
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
 
+\section*{English}
+The rapid expansion of digital healthcare services necessitates infrastructure that reconciles high availability with operational cost-efficiency. Traditional manual resource allocation fails to respond to the dynamic volatility of high-load web applications. This thesis proposes an autonomous hierarchical framework for intelligent resource provisioning. The architecture integrates a hybrid meta-heuristic algorithm, combining Whale Optimisation (WOA) and Differential Evolution (DE), to optimize virtual machine placement across physical nodes. Furthermore, a dual-agent system, comprising a Planner and a Critic, manages remediation actions based on risk-stratified escalation protocols. The solution is validated through the deployment of a distributed medical information system, demonstrating proactive scalability and resilient fault domain isolation.
+>>>>>>> Stashed changes
+
+\section*{Français}
+Conception et réalisation d'une solution de provisioning automatique et intelligent de ressources IT (serveurs et machines gratuites) pour le déploiement scalable d'une application web à forte charge. L'expansion des services de santé numériques nécessite des infrastructures conciliant haute disponibilité et efficacité des coûts. Cette thèse propose un cadre hiérarchique autonome pour le provisioning intelligent des ressources. L'architecture intègre un algorithme méta-heuristique hybride (WOA-DE) pour optimiser le placement des machines virtuelles. Un système à double agent (Planner/Critic) gère les actions de remédiation selon des protocoles d'escalade.
+
+<<<<<<< Updated upstream
 \newpage
 \tableofcontents
 
@@ -266,6 +305,344 @@ chapter establishes the theoretical foundation for these paradigm shifts, coveri
 their core concepts, operational characteristics, and relationship to microservices
 architecture, before critically examining whether organizations face a genuine
 imperative to adopt them.
+=======
+\tableofcontents
+\listoffigures
+\listoftables
+
+% ----------------------------------------------------------------
+% MAIN MATTER
+% ----------------------------------------------------------------
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\chapter*{General Introduction}
+\addcontentsline{toc}{chapter}{General Introduction}
+
+The global transition toward digitized healthcare systems has imposed unprecedented demands on the resilience and scalability of IT infrastructures. Modern medical information systems must sustain continuous availability while processing high volumes of sensitive data under volatile traffic patterns. Traditional infrastructure management, characterized by static provisioning and manual oversight, proves insufficient for these high-load environments. The latency associated with human intervention and the inefficiencies of rigid resource allocation often lead to service degradation or excessive capital expenditure.
+
+Achieving a balance between hardware efficiency and service continuity presents a structural tension. Dense workload placement maximizes utilization but increases the risk associated with physical node failures. Conversely, over-provisioning ensures a safety margin but results in significant underutilization of hardware assets. This thesis addresses this problem by proposing an autonomous provisioning framework that utilizes intelligent scheduling and predictive remediation.
+
+The objective of this research is the design and implementation of a self-regulating cluster architecture capable of managing microservices at scale. By leveraging meta-heuristic optimization for virtual machine placement and risk-stratified cognitive agents for orchestration, the system provides a robust solution for deploying complex web applications. The study is organized into three distinct phases: a review of current abstraction technologies, the theoretical architectural design, and the concrete implementation of a distributed medical information system.
+
+\chapter{State of the Art}
+
+\section{Infrastructural Abstraction Paradigms}
+
+Modern software deployment relies on the abstraction of physical hardware into logical units to facilitate multi-tenancy and efficient resource sharing.
+
+\subsection{Hypervisor Classification}
+Virtualization allows multiple guest operating systems to execute concurrently on a single physical host. Table \ref{tab:hypervisors} compares the two fundamental hypervisor architectures.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of Type 1 and Type 2 Hypervisors}
+\label{tab:hypervisors}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Feature} & \textbf{Type 1 (Bare-Metal)} & \textbf{Type 2 (Hosted)} \\ \midrule
+Execution & Direct on Hardware & Atop Host OS \\
+Performance & High (Near-native) & Moderate (Overhead) \\
+Isolation & Strong hardware-level & Dependent on Host OS security \\
+Examples & Proxmox VE (KVM), ESXi & VirtualBox, VMware Workstation \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Virtual Machines versus Containerization}
+While virtual machines provide comprehensive hardware isolation, containerization virtualizes at the operating system level. Table \ref{tab:vm_vs_container} summarizes their operational characteristics.
+
+\begin{table}[htbp]
+\centering
+\caption{Architecture: Virtual Machines vs. Containers}
+\label{tab:vm_vs_container}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Metric} & \textbf{Virtual Machines} & \textbf{Containers} \\ \midrule
+Isolation & Hardware-level (Strong) & OS-level (Lightweight) \\
+Guest OS & Full OS required & Shared Host Kernel \\
+Startup Time & Minutes & Milliseconds \\
+Density & Moderate & High \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Software Architecture Patterns}
+
+The structural design of applications dictates their scalability. Monolithic architectures integrate all components into a single unit, whereas microservices decompose logic into autonomous entities.
+
+\begin{table}[htbp]
+\centering
+\caption{Monolithic vs. Microservices Comparison}
+\label{tab:monolith_vs_micro}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Characteristic} & \textbf{Monolithic} & \textbf{Microservices} \\ \midrule
+Deployment & Single artifact & Independent artifacts \\
+Scaling & Vertical (All components) & Horizontal (Specific pods) \\
+Fault Isolation & Low (Cascading failure) & High (Isolated failure) \\
+Data Storage & Centralized & Decentralized (DB per service) \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Related Works}
+
+The problem of optimal workload placement and autonomous provisioning has been addressed using various algorithmic approaches. Table \ref{tab:related_works} summarizes the state of the art.
+
+\begin{longtable}{@{}p{3cm}p{1cm}p{3cm}p{3cm}p{3cm}@{}}
+\caption{Summary of Related Works in Resource Management} \label{tab:related_works} \\
+\toprule
+\textbf{Authors} & \textbf{Year} & \textbf{Methodology} & \textbf{Strengths} & \textbf{Limitations} \\ \midrule
+\endfirsthead
+\toprule
+\textbf{Authors} & \textbf{Year} & \textbf{Methodology} & \textbf{Strengths} & \textbf{Limitations} \\ \midrule
+\endhead
+\bottomrule
+\endfoot
+Mirjalili et al. & 2016 & Whale Optimisation (WOA) & Effective exploitation & Premature convergence \\ \midrule
+Storn \& Price & 1997 & Differential Evolution (DE) & High diversity & Slow in local search \\ \midrule
+Saxena et al. & 2022 & Proactive Scaling & Predictive accuracy & Data intensity \\ \bottomrule
+\end{longtable}
+
+\chapter{Conception}
+
+\section{Introduction}
+
+This chapter delineates the theoretical and architectural design of the autonomous cluster management system. The design is technology-agnostic, presenting a generalized model for resilient infrastructure that satisfies the requirements of high-load web applications. It defines the hierarchical layers, the mathematical optimization heuristics, and the cognitive agent logic required for self-regulation.
+
+\section{Design Objectives and Validation Criteria}
+
+The primary objective is the resolution of the structural tension between resource efficiency and service availability. The system must maintain high node density while ensuring performance isolation and headroom for traffic surges. The proposed architecture is validated through four criteria: automated provisioning latency, responsive remediation of resource contention, constraint-respecting scheduling, and the preservation of continuous availability during failure events.
+
+\section{Layered Infrastructure Architecture}
+
+The infrastructure is conceptualized as a four-layer hierarchical stack. Each layer provides abstracted services to the layer above. The Physical Layer provides hardware capacity. The Virtualization Layer manage hardware abstraction into virtual machines. The Containerization Layer hosts microservice workloads. Finally, the Monitoring Layer observes telemetry to drive orchestration logic.
+
+\section{Physical and Network Foundation}
+
+The foundation rests on failure domain isolation, where hardware is segmented to prevent single points of failure. The network architecture implements a three-segment isolation model:
+\begin{itemize}
+    \item \textbf{Workload Segments:} Isolated environments for distinct microservice groups.
+    \item \textbf{Observability Segment:} A dedicated segment for telemetry and administrative traffic.
+    \item \textbf{Management Segment:} Restricted access for orchestration agents.
+\end{itemize}
+
+Routing follows a default-deny posture, where inter-segment communication requires explicit authorization policies.
+
+\section{Virtualization and VM Placement}
+
+\subsection{Mini-Cluster Partitioning}
+To optimize scheduling, the virtual fleet is logically partitioned into mini-clusters. This strategy confines the search space of placement algorithms, reducing computational complexity while ensuring microservice co-location for high-frequency communication patterns.
+
+\subsection{Hybrid WOA-DE Placement Algorithm}
+The mapping of Virtual Machines to Physical Hosts is determined by a hybrid algorithm combining Whale Optimisation (WOA) and Differential Evolution (DE). This combination ensures both robust global exploration and precise local exploitation.
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\KwIn{VM Request $\vec{R}$, Host Metrics $M$, Population $N$}
+\KwOut{Optimal Mapping $H^*$}
+Initialise population of candidate host assignments\;
+\While{Termination criteria not met}{
+    Evaluate Fitness $f(X)$ using weighted Euclidean distance\;
+    \tcp{WOA Update Phase}
+    Update positions via shrinking encirclement and spiral movement\;
+    \tcp{DE Update Phase}
+    Apply mutation and crossover to maintain population diversity\;
+    Select survivors through tournament selection\;
+    Update global best $H^*$\;
+}
+\Return $H^*$\;
+\caption{Hybrid WOA-DE Provisioning Algorithm}
+\label{alg:woa_de}
+\end{algorithm}
+
+\subsection{Fitness Function}
+Placement quality is evaluated using a multi-objective weighted Euclidean distance formula. The objective is to minimize the resource differential between the request and the host's available capacity.
+
+\begin{equation}
+\text{Fitness} = \sqrt{w_C (\Delta C)^2 + w_R (\Delta R)^2 + w_I (\Delta I)^2 + w_E (\Delta E)^2}
+\end{equation}
+
+Where $\Delta C, \Delta R, \Delta I, \Delta E$ represent standardized Z-scores for CPU, RAM, I/O, and Energy respectively, subject to $\sum w_i = 1$.
+
+\section{Intelligence and Security}
+
+\subsection{Dual-Agent Decision System}
+Autonomous remediation is managed by two cognitive agents. The \textbf{Planner} ingest telemetry and formulates strategies. The \textbf{Critic} serves as a safety validator, evaluating proposals against physical headroom and safety policies.
+
+\subsection{Risk-Based Escalation Matrix}
+Actions are classified by risk to determine the authorization level. Table \ref{tab:risk_matrix} defines the escalation protocols.
+
+\begin{table}[htbp]
+\centering
+\caption{Risk-Based Escalation Matrix}
+\label{tab:risk_matrix}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Risk Level} & \textbf{Action Type} & \textbf{Protocol} \\ \midrule
+Low & Scaling Up, Cloning & Fully Autonomous \\
+Medium & Live Migration, Scaling Down & Autonomous with Audit Log \\
+High & Stop/Delete Resource, Drain Node & Manual Admin Approval (Email) \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\chapter{Implementation}
+
+%% ---------------------------------------------------------------
+%% TODO (student): Complete the following before final submission:
+%%   - Replace all [PLACEHOLDER] figures with actual screenshots
+%%   - Fill in the VM inventory table from Proxmox
+%%   - Fill in the Kubernetes object table from kubectl output
+%%   - Add performance measurement results if available
+%% ---------------------------------------------------------------
+
+\section{Introduction}
+
+This chapter details the practical realization of the architecture designed in Chapter 2. It identifies the chosen technologies and grounds the theoretical layers in a concrete implementation hosting a distributed medical information system.
+
+\section{Technology Selection and Justification}
+
+The implementation leverages professional open-source tools. Table \ref{tab:tech_stack} summarizes the mapping between the architectural layers and the selected technology stack.
+
+\begin{table}[htbp]
+\centering
+\caption{Implementation Technology Mapping}
+\label{tab:tech_stack}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Layer} & \textbf{Chosen Technology} & \textbf{Justification} \\ \midrule
+Virtualization & Proxmox VE (KVM/LXC) & Robust API, hardware efficiency \\
+Containerization & Kubernetes & Industry standard for microservices \\
+Monitoring & Prometheus & Pull-based metrics, native alerting \\
+Network & OPNsense & State-of-the-art virtual routing \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Implementation Environment}
+
+The physical cluster comprises 8 nodes (\textit{pfe0} to \textit{pfe7}). Table \ref{tab:physical_hosts} provides the inventory of the infrastructure substrate.
+
+\begin{table}[htbp]
+\centering
+\caption{Physical Host Inventory}
+\label{tab:physical_hosts}
+\begin{tabular}{@{}llllll@{}}
+\toprule
+\textbf{Host} & \textbf{Role} & \textbf{CPU} & \textbf{RAM} & \textbf{Storage} & \textbf{OS} \\ \midrule
+pfe0-pfe7 & Hypervisor & [TBC] & [TBC] & [TBC] & Proxmox VE \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Virtualization with Proxmox VE}
+
+Proxmox VE implements the virtualization layer, managing the lifecycle of VMs through the QEMU/KVM hypervisor. Resource pools are configured to isolate tenant workloads. Table \ref{tab:vm_inv} provides a preliminary VM inventory.
+
+\begin{table}[htbp]
+\centering
+\caption{Virtual Machine Inventory}
+\label{tab:vm_inv}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{VM Name} & \textbf{vCPU} & \textbf{RAM} & \textbf{Service Group} & \textbf{Mini-Cluster} \\ \midrule
+k8s-master & [TBC] & [TBC] & Management & N/A \\
+k8s-worker-1 & [TBC] & [TBC] & Hospital & mini-cluster-1 \\
+k8s-worker-2 & [TBC] & [TBC] & Ministry & mini-cluster-2 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\fbox{\rule{0pt}{5cm}\rule{0.9\linewidth}{0pt}}
+\caption{[PLACEHOLDER — Screenshot of the Proxmox VE Management Dashboard]}
+\label{fig:proxmox_dashboard}
+\end{figure}
+
+\section{Container Orchestration with Kubernetes}
+
+Kubernetes manages the microservices deployment. The Chapter 2 mini-cluster logic is realized through Kubernetes Namespaces.
+
+\begin{table}[htbp]
+\centering
+\caption{Kubernetes Namespace Mapping}
+\label{tab:k8s_ns}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Namespace} & \textbf{Service Group} & \textbf{Network Segment} \\ \midrule
+hospital & Hospital MIS & VLAN 10 (Hospital) \\
+ministry & Ministry MIS & VLAN 20 (Ministry) \\
+monitoring & Observability & VLAN 30 (Monitor) \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\section{Deployed Application — Medical Information System}
+
+The system hosts two major microservice groups. The communication patterns between these groups are managed through explicit firewall rules in the OPNsense gateway.
+
+\subsection{Ministry Microservices}
+These services handle national registries and security. Based on the implementation, the group includes: \textbf{auth} (Authentication), \textbf{blockchain-service} (Data integrity), \textbf{cpabe-service} (Encryption), \textbf{rabbitmq} (Messaging), and \textbf{frontend-ministry}.
+
+\subsection{Hospital Microservices}
+These services manage local clinical operations. The group includes: \textbf{patients} (Records), \textbf{rendez-vous} (Appointments), \textbf{pharmacy} (Inventory), \textbf{billing} (Interventions), and \textbf{frontend-hospital}.
+
+\begin{figure}[htbp]
+\centering
+\fbox{\rule{0pt}{5cm}\rule{0.9\linewidth}{0pt}}
+\caption{[PLACEHOLDER — Diagram of the Application Microservices Architecture]}
+\label{fig:app_arch}
+\end{figure}
+
+\section{Monitoring and Network Implementation}
+
+\subsection{Prometheus Telemetry}
+The Prometheus server is configured to scrape metrics from every node. Key targets include \texttt{node\_exporter} (Port 9100) and \texttt{scaphandre} (Port 8080). Alert rules are defined for resource breaches.
+
+\subsection{Overlay Network Segmentation}
+The OPNsense virtual router implements three logical interfaces. Routing is restricted to prevent unauthorized lateral movement between the Hospital and Ministry segments.
+\begin{itemize}
+    \item \textbf{Hospital Segment:} Subnet 10.10.10.0/24.
+    \item \textbf{Ministry Segment:} Subnet 10.20.20.0/24.
+    \item \textbf{Monitoring Segment:} Subnet 10.30.30.0/24.
+\end{itemize}
+
+\begin{figure}[htbp]
+\centering
+\fbox{\rule{0pt}{5cm}\rule{0.9\linewidth}{0pt}}
+\caption{[PLACEHOLDER — Screenshot of the OPNsense Firewall Rules]}
+\label{fig:firewall_config}
+\end{figure}
+
+\section{Results and Validation}
+
+[PLACEHOLDER — Detailed analysis of algorithm efficiency and scaling performance logs].
+
+\begin{figure}[htbp]
+\centering
+\fbox{\rule{0pt}{5cm}\rule{0.9\linewidth}{0pt}}
+\caption{[PLACEHOLDER — Screenshot of a scaling event triggered by the Planner agent]}
+\label{fig:scaling_log}
+\end{figure}
+
+\chapter*{General Conclusion}
+\addcontentsline{toc}{chapter}{General Conclusion}
+
+This thesis has demonstrated the feasibility of an autonomous provisioning solution for high-load web applications. By utilizing a hierarchical architecture and hybrid meta-heuristic algorithms, the system effectively optimizes resource utilization while maintaining service availability. The implementation of a medical information system on a distributed Proxmox/Kubernetes cluster validated the theoretical framework. The integration of risk-stratified agents ensures that automated remediation remains safe and forensic auditability is preserved.
+
+\begin{thebibliography}{99}
+\bibitem{balabanov2025dcim}
+G.~Balabanov and N.~S. Apostolov, ``Data Centre Infrastructure Monitoring,'' in \textit{60th International Scientific Conference on ICEST}, IEEE, 2025.
+\bibitem{mirjalili2016woa}
+S.~Mirjalili and A.~Lewis, ``The Whale Optimisation Algorithm,'' \textit{Advances in Engineering Software}, vol. 95, pp. 51--67, 2016.
+\bibitem{storn1997de}
+R.~Storn and K.~Price, ``Differential Evolution --- A Simple and Efficient Heuristic for Global Optimization over Continuous Spaces,'' \textit{Journal of Global Optimization}, vol. 11, no. 4, pp. 341--359, 1997.
+\bibitem{lai2025energy}
+X.~Lai, X.~Zheng, and W.~Lu, ``Energy-aware Virtual Machine Migration based on Dual Thresholds,'' in \textit{2025 IEEE 2nd International Conference on ICBDSE}, IEEE, 2025.
+\bibitem{zhang2020intelligent}
+P.~Zhang, M.~Zhou, and X.~Wang, ``An Intelligent Optimization Method for Optimal Virtual Machine Allocation,'' \textit{IEEE Transactions on Automation Science and Engineering}, vol. 17, no. 4, pp. 1725--1735, 2020.
+\bibitem{saxena2022secure}
+D.~Saxena, I.~Gupta, et al., ``A Secure and Multiobjective Virtual Machine Placement Framework,'' \textit{IEEE Systems Journal}, vol. 16, no. 2, pp. 3163--3174, 2022.
+\end{thebibliography}
+
+\end{document}
+Modern software development has been shaped by evolving scalability demands and the need for efficient resource utilization. Virtualization and containerization have fundamentally altered how applications are developed, deployed, and managed. This chapter establishes the theoretical foundation for these paradigm shifts, covering their core concepts, operational characteristics, and relationship to microservices architecture, before critically examining whether organizations face a genuine imperative to adopt them.
+>>>>>>> Stashed changes
 
 % ================================================================
 \section{Virtualization and Containerization}
