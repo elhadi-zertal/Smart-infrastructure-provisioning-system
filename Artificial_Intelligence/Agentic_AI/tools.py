@@ -3,7 +3,7 @@ import sqlite3
 import json
 import os
  
-AGENT_DB_PATH = os.getenv("AGENT_DB_PATH", "./agent_state.db")
+AGENT_DB_PATH = os.getenv("AGENT_DB_PATH", "./agent_memory.db")
 BASE          = "http://localhost:8000"   # Alert Manager (main.py)
  
  
