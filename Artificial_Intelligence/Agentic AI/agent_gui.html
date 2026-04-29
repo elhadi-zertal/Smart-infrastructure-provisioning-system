@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cluster Q&A Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e1117;
+      --surface: #161b27;
+      --border: #252d3d;
+      --accent: #4f9eff;
+      --accent2: #00d4aa;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --success: #00d4aa;
+      --user-bg: #1a2235;
+      --error: #ff6b6b;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    .logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #4f9eff, #00d4aa);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: #0e1117;
+      flex-shrink: 0;
+    }
+
+    .title-block .title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .title-block .subtitle {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: blink 2.5s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .dot-label {
+      font-size: 11px;
+      color: var(--success);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .api-badge {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .api-badge:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Chat area ── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-area::-webkit-scrollbar { width: 4px; }
+    .chat-area::-webkit-scrollbar-track { background: transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── Messages ── */
+    .msg {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      animation: fadein 0.2s ease;
+    }
+
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .avatar.agent {
+      background: linear-gradient(135deg, #4f9eff22, #00d4aa22);
+      border: 1px solid var(--border);
+      color: var(--accent);
+    }
+
+    .avatar.user {
+      background: #1e2a40;
+      border: 1px solid var(--border);
+      color: var(--accent2);
+    }
+
+    .bubble {
+      max-width: 78%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .bubble.agent {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-top-left-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .bubble.user {
+      background: var(--user-bg);
+      border: 1px solid #2a3a5e;
+      color: var(--text);
+      border-top-right-radius: 4px;
+    }
+
+    .bubble.error {
+      background: #2a1a1a;
+      border: 1px solid #5e2a2a;
+      color: var(--error);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Typing indicator ── */
+    .typing {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      padding: 4px 0;
+    }
+
+    .typing span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+      40%            { opacity: 1;   transform: scale(1); }
+    }
+
+    /* ── Suggestion chips ── */
+    .suggestions {
+      padding: 0 24px 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .chip {
+      font-size: 11px;
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+
+    .chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #4f9eff11;
+    }
+
+    /* ── Input area ── */
+    .input-area {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      resize: none;
+      outline: none;
+      min-height: 44px;
+      max-height: 140px;
+      overflow-y: auto;
+      transition: border-color 0.15s, min-height 0.15s;
+      line-height: 1.5;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .send-btn {
+      background: linear-gradient(135deg, #4f9eff, #00d4aa);
+      border: none;
+      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .send-btn:hover  { opacity: 0.88; }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .send-btn svg { fill: #0e1117; width: 18px; height: 18px; }
+
+    /* ── API URL modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+    .modal p  { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace; line-height: 1.5; }
+
+    .modal input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      outline: none;
+    }
+
+    .modal input:focus { border-color: var(--accent); }
+
+    .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .btn-cancel {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 14px;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      transition: border-color 0.15s;
+    }
+
+    .btn-cancel:hover { border-color: var(--muted); }
+
+    .btn-save {
+      background: linear-gradient(135deg, #4f9eff, #00d4aa);
+      border: none;
+      border-radius: 8px;
+      padding: 7px 14px;
+      color: #0e1117;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .empty-icon { font-size: 32px; opacity: 0.4; }
+    .empty-text { font-size: 13px; font-family: 'JetBrains Mono', monospace; opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">C</div>
+  <div class="title-block">
+    <div class="title">Cluster Q&amp;A Agent</div>
+    <div class="subtitle">read-only · LLM-powered</div>
+  </div>
+  <button class="api-badge" onclick="openModal()" title="Change API URL" id="apiBadge">localhost:8000</button>
+  <div class="status">
+    <div class="dot" id="statusDot"></div>
+    <span class="dot-label" id="statusLabel">online</span>
+  </div>
+</header>
+
+<!-- ── Chat ── -->
+<div class="chat-area" id="chat">
+  <div class="msg">
+    <div class="avatar agent">A</div>
+    <div class="bubble agent">Hello! I'm your cluster assistant. Ask me anything about your cluster — nodes, pods, services, logs, or resource usage.
+
+I only read cluster data, I never modify anything.</div>
+  </div>
+</div>
+
+<!-- ── Suggestion chips ── -->
+<div class="suggestions" id="suggestions">
+  <button class="chip" onclick="fillQ('How many nodes are currently running?')">How many nodes are running?</button>
+  <button class="chip" onclick="fillQ('Show me pods with high CPU usage')">High CPU pods</button>
+  <button class="chip" onclick="fillQ('Are there any failed or crashlooping deployments?')">Failed deployments</button>
+  <button class="chip" onclick="fillQ('What is the overall cluster health status?')">Cluster health</button>
+  <button class="chip" onclick="fillQ('List all namespaces')">List namespaces</button>
+  <button class="chip" onclick="fillQ('Which services are exposed externally?')">External services</button>
+</div>
+
+<!-- ── Input ── -->
+<div class="input-area">
+  <textarea id="input" placeholder="Ask about your cluster…" rows="1"
+    onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="sendQuestion()" title="Send">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+  </button>
+</div>
+
+<!-- ── API URL Modal ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>API base URL</h2>
+    <p>Point this GUI to your running FastAPI server.<br>Example: http://localhost:8000</p>
+    <input type="text" id="apiInput" placeholder="http://localhost:8000"/>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveUrl()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── Config ── */
+  let API_BASE = localStorage.getItem('cluster_qa_api') || 'http://30.10.10.100:8002';
+  document.getElementById('apiBadge').textContent = API_BASE.replace(/^https?:\/\//, '');
+  document.getElementById('apiInput').value = API_BASE;
+
+  const chat    = document.getElementById('chat');
+  const input   = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+
+  /* ── Auto-resize textarea ── */
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }
+
+  /* ── Suggestion chips ── */
+  function fillQ(q) {
+    input.value = q;
+    autoResize(input);
+    input.focus();
+  }
+
+  /* ── Keyboard shortcut ── */
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendQuestion();
+    }
+  }
+
+  /* ── Add message bubble ── */
+  function addMsg(role, text, typing) {
+    // Remove empty state if present
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${role}`;
+
+    const av = document.createElement('div');
+    av.className = `avatar ${role}`;
+    av.textContent = role === 'agent' ? 'A' : 'U';
+
+    const bub = document.createElement('div');
+    bub.className = `bubble ${role}`;
+
+    if (typing) {
+      bub.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+      bub.id = 'typing-bubble';
+    } else {
+      bub.textContent = text;
+    }
+
+    wrap.appendChild(av);
+    wrap.appendChild(bub);
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+    return bub;
+  }
+
+  /* ── Set error bubble ── */
+  function setError(bub, msg) {
+    bub.className = 'bubble error';
+    bub.textContent = msg;
+  }
+
+  /* ── Send question ── */
+  async function sendQuestion() {
+    const q = input.value.trim();
+    if (!q) return;
+
+    // Hide chips after first question
+    document.getElementById('suggestions').style.display = 'none';
+
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    addMsg('user', q);
+    const typingBub = addMsg('agent', '', true);
+
+    try {
+      const res = await fetch(`${API_BASE}/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q }),
+        signal: AbortSignal.timeout(60000)
+      });
+
+      if (!res.ok) {
+        setError(typingBub, `HTTP ${res.status} — ${res.statusText}`);
+        setStatus('error');
+      } else {
+        const data = await res.json();
+        typingBub.className = 'bubble agent';
+        typingBub.textContent = data.answer || '(no answer returned)';
+        setStatus('online');
+      }
+    } catch (err) {
+      if (err.name === 'TimeoutError') {
+        setError(typingBub, 'Request timed out (>60s). The agent may still be working.');
+      } else {
+        setError(typingBub,
+          `Could not reach ${API_BASE}/ask\n\nMake sure:\n• FastAPI server is running\n• CORS middleware is enabled\n• The URL is correct (click the badge in the header)`
+        );
+        setStatus('error');
+      }
+    }
+
+    sendBtn.disabled = false;
+    input.focus();
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  /* ── Status indicator ── */
+  function setStatus(state) {
+    const dot   = document.getElementById('statusDot');
+    const label = document.getElementById('statusLabel');
+    if (state === 'error') {
+      dot.style.background   = '#ff6b6b';
+      dot.style.animation    = 'none';
+      label.style.color      = '#ff6b6b';
+      label.textContent      = 'unreachable';
+    } else {
+      dot.style.background   = 'var(--success)';
+      dot.style.animation    = 'blink 2.5s ease-in-out infinite';
+      label.style.color      = 'var(--success)';
+      label.textContent      = 'online';
+    }
+  }
+
+  /* ── Health check on load ── */
+  (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(4000) });
+      setStatus(r.ok ? 'online' : 'error');
+    } catch { setStatus('error'); }
+  })();
+
+  /* ── Modal ── */
+  function openModal() {
+    document.getElementById('apiInput').value = API_BASE;
+    document.getElementById('modalOverlay').classList.add('open');
+    document.getElementById('apiInput').focus();
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+
+  function saveUrl() {
+    const val = document.getElementById('apiInput').value.trim().replace(/\/$/, '');
+    if (!val) return;
+    API_BASE = val;
+    localStorage.setItem('cluster_qa_api', API_BASE);
+    document.getElementById('apiBadge').textContent = API_BASE.replace(/^https?:\/\//, '');
+    closeModal();
+    setStatus('online');
+    // Re-check health with new URL
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(4000) });
+        setStatus(r.ok ? 'online' : 'error');
+      } catch { setStatus('error'); }
+    })();
+  }
+
+  // Close modal on overlay click
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Save URL on Enter key inside modal input
+  document.getElementById('apiInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveUrl();
+  });
+</script>
+</body>
+</html>

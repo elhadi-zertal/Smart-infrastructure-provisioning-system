@@ -1,10 +1,13 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import asyncio
 import logging
 from agents import run_planner
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -22,9 +25,22 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class Query(BaseModel):
     question: str
+
+
+@app.get("/")
+def serve_gui():
+    """Serve the Q&A GUI."""
+    return FileResponse("gui.html")
 
 
 @app.post("/ask")
@@ -41,3 +57,9 @@ async def ask(query: Query):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+
+#run with
+#pip install aiofiles   # needed for FileResponse
+#uvicorn agent_service:app --host 0.0.0.0 --port 8002
