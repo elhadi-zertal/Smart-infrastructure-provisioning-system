@@ -58,8 +58,6 @@ async def ask(query: Query):
 def health():
     return {"status": "ok"}
 
-
-
 #run with
 #pip install aiofiles   # needed for FileResponse
 #uvicorn agent_service:app --host 0.0.0.0 --port 8002
