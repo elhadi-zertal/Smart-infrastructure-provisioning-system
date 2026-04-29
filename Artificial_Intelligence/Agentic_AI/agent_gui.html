@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Cluster Q&A Agent</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -21,9 +22,7 @@
       --error: #ff6b6b;
     }
 
-    html, body {
-      height: 100%;
-    }
+    html, body { height: 100%; }
 
     body {
       font-family: 'Syne', sans-serif;
@@ -90,7 +89,7 @@
 
     @keyframes blink {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      50%       { opacity: 0.4; }
     }
 
     .dot-label {
@@ -174,7 +173,6 @@
       border-radius: 12px;
       font-size: 13px;
       line-height: 1.65;
-      white-space: pre-wrap;
       word-break: break-word;
     }
 
@@ -186,11 +184,37 @@
       font-family: 'JetBrains Mono', monospace;
     }
 
+    /* ── Markdown rendered content inside agent bubbles ── */
+    .bubble.agent p          { margin-bottom: 8px; }
+    .bubble.agent p:last-child { margin-bottom: 0; }
+    .bubble.agent ul,
+    .bubble.agent ol         { padding-left: 18px; margin-bottom: 8px; }
+    .bubble.agent li         { margin-bottom: 4px; }
+    .bubble.agent strong     { color: var(--accent); font-weight: 600; }
+    .bubble.agent em         { color: var(--accent2); font-style: italic; }
+    .bubble.agent h1,
+    .bubble.agent h2,
+    .bubble.agent h3         { color: var(--accent); margin-bottom: 6px; margin-top: 10px; font-size: 13px; }
+    .bubble.agent h1:first-child,
+    .bubble.agent h2:first-child,
+    .bubble.agent h3:first-child { margin-top: 0; }
+    .bubble.agent code       { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent2); background: #0e111799; padding: 1px 5px; border-radius: 4px; }
+    .bubble.agent pre        { background: #0a0d12; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 8px 0; }
+    .bubble.agent pre code   { background: none; padding: 0; color: var(--text); }
+    .bubble.agent table      { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+    .bubble.agent th         { background: #1e2a3a; color: var(--accent); padding: 6px 10px; text-align: left; border: 1px solid var(--border); }
+    .bubble.agent td         { padding: 5px 10px; border: 1px solid var(--border); color: var(--text); }
+    .bubble.agent tr:nth-child(even) td { background: #12171f; }
+    .bubble.agent blockquote { border-left: 3px solid var(--accent); padding-left: 10px; color: var(--muted); margin: 6px 0; }
+    .bubble.agent hr         { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+    .bubble.agent a          { color: var(--accent); text-decoration: underline; }
+
     .bubble.user {
       background: var(--user-bg);
       border: 1px solid #2a3a5e;
       color: var(--text);
       border-top-right-radius: 4px;
+      white-space: pre-wrap;
     }
 
     .bubble.error {
@@ -198,6 +222,7 @@
       border: 1px solid #5e2a2a;
       color: var(--error);
       font-family: 'JetBrains Mono', monospace;
+      white-space: pre-wrap;
     }
 
     /* ── Typing indicator ── */
@@ -276,7 +301,7 @@
       min-height: 44px;
       max-height: 140px;
       overflow-y: auto;
-      transition: border-color 0.15s, min-height 0.15s;
+      transition: border-color 0.15s;
       line-height: 1.5;
     }
 
@@ -297,10 +322,9 @@
       transition: opacity 0.15s, transform 0.1s;
     }
 
-    .send-btn:hover  { opacity: 0.88; }
-    .send-btn:active { transform: scale(0.95); }
+    .send-btn:hover   { opacity: 0.88; }
+    .send-btn:active  { transform: scale(0.95); }
     .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
     .send-btn svg { fill: #0e1117; width: 18px; height: 18px; }
 
     /* ── API URL modal ── */
@@ -371,21 +395,6 @@
       cursor: pointer;
       font-family: 'Syne', sans-serif;
     }
-
-    /* ── Empty state ── */
-    .empty {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      color: var(--muted);
-      pointer-events: none;
-    }
-
-    .empty-icon { font-size: 32px; opacity: 0.4; }
-    .empty-text { font-size: 13px; font-family: 'JetBrains Mono', monospace; opacity: 0.5; }
   </style>
 </head>
 <body>
@@ -397,10 +406,10 @@
     <div class="title">Cluster Q&amp;A Agent</div>
     <div class="subtitle">read-only · LLM-powered</div>
   </div>
-  <button class="api-badge" onclick="openModal()" title="Change API URL" id="apiBadge">localhost:8000</button>
+  <button class="api-badge" onclick="openModal()" title="Change API URL" id="apiBadge">loading…</button>
   <div class="status">
     <div class="dot" id="statusDot"></div>
-    <span class="dot-label" id="statusLabel">online</span>
+    <span class="dot-label" id="statusLabel">checking…</span>
   </div>
 </header>
 
@@ -408,20 +417,18 @@
 <div class="chat-area" id="chat">
   <div class="msg">
     <div class="avatar agent">A</div>
-    <div class="bubble agent">Hello! I'm your cluster assistant. Ask me anything about your cluster — nodes, pods, services, logs, or resource usage.
-
-I only read cluster data, I never modify anything.</div>
+    <div class="bubble agent">Hello! I'm your cluster assistant. Ask me anything about your cluster — nodes, VMs, deployments, resource usage, or the warning queue.<br><br>I only read cluster data, I never modify anything.</div>
   </div>
 </div>
 
 <!-- ── Suggestion chips ── -->
 <div class="suggestions" id="suggestions">
-  <button class="chip" onclick="fillQ('How many nodes are currently running?')">How many nodes are running?</button>
-  <button class="chip" onclick="fillQ('Show me pods with high CPU usage')">High CPU pods</button>
+  <button class="chip" onclick="fillQ('How is the cluster doing overall?')">Cluster health</button>
+  <button class="chip" onclick="fillQ('Which nodes are under the most CPU pressure?')">Node CPU pressure</button>
   <button class="chip" onclick="fillQ('Are there any failed or crashlooping deployments?')">Failed deployments</button>
-  <button class="chip" onclick="fillQ('What is the overall cluster health status?')">Cluster health</button>
-  <button class="chip" onclick="fillQ('List all namespaces')">List namespaces</button>
-  <button class="chip" onclick="fillQ('Which services are exposed externally?')">External services</button>
+  <button class="chip" onclick="fillQ('What is the XGBoost model currently predicting as the bottleneck?')">XGBoost prediction</button>
+  <button class="chip" onclick="fillQ('Is there anything in the warning queue?')">Warning queue</button>
+  <button class="chip" onclick="fillQ('Are there any actions waiting for my approval?')">Approval queue</button>
 </div>
 
 <!-- ── Input ── -->
@@ -429,7 +436,9 @@ I only read cluster data, I never modify anything.</div>
   <textarea id="input" placeholder="Ask about your cluster…" rows="1"
     onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
   <button class="send-btn" id="sendBtn" onclick="sendQuestion()" title="Send">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+    </svg>
   </button>
 </div>
 
@@ -437,18 +446,23 @@ I only read cluster data, I never modify anything.</div>
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h2>API base URL</h2>
-    <p>Point this GUI to your running FastAPI server.<br>Example: http://localhost:8000</p>
-    <input type="text" id="apiInput" placeholder="http://localhost:8000"/>
+    <p>Point this GUI to your running FastAPI agent service.<br>Example: http://10.30.30.100:8002</p>
+    <input type="text" id="apiInput" placeholder="http://10.30.30.100:8002"/>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-save" onclick="saveUrl()">Save</button>
+      <button class="btn-save"   onclick="saveUrl()">Save</button>
     </div>
   </div>
 </div>
 
 <script>
-  /* ── Config ── */
-  let API_BASE = localStorage.getItem('cluster_qa_api') || 'http://30.10.10.100:8002';
+  /* ── marked.js config — safe rendering ── */
+  marked.setOptions({ breaks: true, gfm: true });
+
+  /* ── API base URL — stored in localStorage, defaults to same origin ── */
+  let API_BASE = localStorage.getItem('cluster_qa_api')
+    || `${window.location.protocol}//${window.location.hostname}:8002`;
+
   document.getElementById('apiBadge').textContent = API_BASE.replace(/^https?:\/\//, '');
   document.getElementById('apiInput').value = API_BASE;
 
@@ -462,14 +476,14 @@ I only read cluster data, I never modify anything.</div>
     el.style.height = Math.min(el.scrollHeight, 140) + 'px';
   }
 
-  /* ── Suggestion chips ── */
+  /* ── Fill input from chip ── */
   function fillQ(q) {
     input.value = q;
     autoResize(input);
     input.focus();
   }
 
-  /* ── Keyboard shortcut ── */
+  /* ── Enter to send, Shift+Enter for newline ── */
   function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -477,12 +491,8 @@ I only read cluster data, I never modify anything.</div>
     }
   }
 
-  /* ── Add message bubble ── */
+  /* ── Add a message bubble ── */
   function addMsg(role, text, typing) {
-    // Remove empty state if present
-    const empty = document.getElementById('emptyState');
-    if (empty) empty.remove();
-
     const wrap = document.createElement('div');
     wrap.className = `msg ${role}`;
 
@@ -495,7 +505,9 @@ I only read cluster data, I never modify anything.</div>
 
     if (typing) {
       bub.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
-      bub.id = 'typing-bubble';
+    } else if (role === 'agent') {
+      /* render markdown for agent messages */
+      bub.innerHTML = marked.parse(text);
     } else {
       bub.textContent = text;
     }
@@ -507,18 +519,17 @@ I only read cluster data, I never modify anything.</div>
     return bub;
   }
 
-  /* ── Set error bubble ── */
+  /* ── Turn a bubble into an error ── */
   function setError(bub, msg) {
     bub.className = 'bubble error';
     bub.textContent = msg;
   }
 
-  /* ── Send question ── */
+  /* ── Main send function ── */
   async function sendQuestion() {
     const q = input.value.trim();
     if (!q) return;
 
-    // Hide chips after first question
     document.getElementById('suggestions').style.display = 'none';
 
     input.value = '';
@@ -541,16 +552,21 @@ I only read cluster data, I never modify anything.</div>
         setStatus('error');
       } else {
         const data = await res.json();
+        const answer = data.answer || '(no answer returned)';
         typingBub.className = 'bubble agent';
-        typingBub.textContent = data.answer || '(no answer returned)';
+        typingBub.innerHTML = marked.parse(answer);
         setStatus('online');
       }
     } catch (err) {
       if (err.name === 'TimeoutError') {
-        setError(typingBub, 'Request timed out (>60s). The agent may still be working.');
+        setError(typingBub, 'Request timed out (>60 s). The agent may still be processing.');
       } else {
         setError(typingBub,
-          `Could not reach ${API_BASE}/ask\n\nMake sure:\n• FastAPI server is running\n• CORS middleware is enabled\n• The URL is correct (click the badge in the header)`
+          `Could not reach ${API_BASE}/ask\n\n` +
+          `Make sure:\n` +
+          `• The agent service is running\n` +
+          `• CORS middleware is enabled in FastAPI\n` +
+          `• The URL is correct (click the badge in the header)`
         );
         setStatus('error');
       }
@@ -561,29 +577,31 @@ I only read cluster data, I never modify anything.</div>
     chat.scrollTop = chat.scrollHeight;
   }
 
-  /* ── Status indicator ── */
+  /* ── Status dot ── */
   function setStatus(state) {
     const dot   = document.getElementById('statusDot');
     const label = document.getElementById('statusLabel');
     if (state === 'error') {
-      dot.style.background   = '#ff6b6b';
-      dot.style.animation    = 'none';
-      label.style.color      = '#ff6b6b';
-      label.textContent      = 'unreachable';
+      dot.style.background = '#ff6b6b';
+      dot.style.animation  = 'none';
+      label.style.color    = '#ff6b6b';
+      label.textContent    = 'unreachable';
     } else {
-      dot.style.background   = 'var(--success)';
-      dot.style.animation    = 'blink 2.5s ease-in-out infinite';
-      label.style.color      = 'var(--success)';
-      label.textContent      = 'online';
+      dot.style.background = 'var(--success)';
+      dot.style.animation  = 'blink 2.5s ease-in-out infinite';
+      label.style.color    = 'var(--success)';
+      label.textContent    = 'online';
     }
   }
 
-  /* ── Health check on load ── */
+  /* ── Health check on page load ── */
   (async () => {
     try {
       const r = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(4000) });
       setStatus(r.ok ? 'online' : 'error');
-    } catch { setStatus('error'); }
+    } catch {
+      setStatus('error');
+    }
   })();
 
   /* ── Modal ── */
@@ -604,8 +622,6 @@ I only read cluster data, I never modify anything.</div>
     localStorage.setItem('cluster_qa_api', API_BASE);
     document.getElementById('apiBadge').textContent = API_BASE.replace(/^https?:\/\//, '');
     closeModal();
-    setStatus('online');
-    // Re-check health with new URL
     (async () => {
       try {
         const r = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(4000) });
@@ -614,12 +630,10 @@ I only read cluster data, I never modify anything.</div>
     })();
   }
 
-  // Close modal on overlay click
   document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
   });
 
-  // Save URL on Enter key inside modal input
   document.getElementById('apiInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') saveUrl();
   });
