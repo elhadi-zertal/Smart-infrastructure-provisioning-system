@@ -1,21 +1,51 @@
+# =============================================================================
+# /etc/prometheus/prometheus.yml — FINAL CORRECTED VERSION
+# -----------------------------------------------------------------------------
+# Critical fix: cAdvisor scrape job now uses the correct kube-apiserver URL
+# (https://10.20.20.99:6443).  Without this, no per-pod CPU/RAM metrics flow
+# and no pod-level scaling alert can ever fire.
+#
+# Both K8s scrape jobs (cadvisor + kube_state_metrics) reach the cluster via
+# the apiserver proxy, NOT via NodePort.  This avoids the firewall/VLAN
+# issues we hit between the monitoring VLAN (10.30.30.0/24) and the K8s VLAN
+# (10.20.20.0/24).
+#
+# remote_write to InfluxDB removed — the bearer-token file doesn't exist
+# and was filling logs with errors.  Re-enable later if you set up InfluxDB
+# v2 with a valid token.
+# =============================================================================
+
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval:     10s
+  scrape_timeout:      5s
+  evaluation_interval: 10s
+  external_labels:
+    cluster: pfe-cluster
+    region:  monitoring
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "localhost:9093"
 
 rule_files:
- - /etc/prometheus/rules/*.yml
-
+  - /etc/prometheus/rules/*.yml
 
 scrape_configs:
+
+  # ─── Prometheus self-metrics ───────────────────────────────────────────────
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
+  # ─── Per-host OS metrics via app.py SD ────────────────────────────────────
   - job_name: 'node_exporter'
     http_sd_configs:
       - url: http://localhost:5000/targets/node_exporter
         refresh_interval: 5s
 
+  # ─── Per-VM energy metrics ─────────────────────────────────────────────────
   - job_name: 'scaphandre'
     http_sd_configs:
       - url: http://localhost:5000/targets/scaphandre
@@ -30,7 +60,8 @@ scrape_configs:
         target_label: vm_name
         replacement: '${2}'
 
- - job_name: 'snmp'
+  # ─── SNMP — network device interface counters ────────────────────────────
+  - job_name: 'snmp'
     metrics_path: /snmp
     params:
       module: [if_mib]
@@ -45,13 +76,11 @@ scrape_configs:
       - target_label: __address__
         replacement: localhost:9116
 
-
-
- 
-- job_name: 'blackbox-exporter'
+  # ─── HTTP application reachability probes ────────────────────────────────
+  - job_name: 'blackbox_exporter'
     metrics_path: /probe
     params:
-      module: [http_any] 
+      module: [http_2xx]
     http_sd_configs:
       - url: http://localhost:5000/targets/blackbox_exporter
         refresh_interval: 5s
@@ -61,12 +90,79 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: localhost:9115
+        replacement: 10.30.30.50:9115
 
+  # ─── NGINX LB — VTS counters (only when nginx-vts module is loaded) ──────
+  - job_name: 'nginx_lb'
+    metrics_path: /metrics
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+          - '10.30.30.50:9913'
+        labels:
+          role:    load_balancer
+          vm_name: nginx-lb
 
+  # ===========================================================================
+  # cAdvisor — per-pod CPU/RAM/network from every kubelet
+  # FIX: api_server changed from 10.20.20.10 to 10.20.20.99 (the actual
+  # kube-master IP — verified by: kubectl cluster-info)
+  # ===========================================================================
+  - job_name: 'cadvisor'
+    scheme: https
+    tls_config:
+      ca_file: /etc/prometheus/k8s/ca.crt
+      insecure_skip_verify: true
+    bearer_token_file: /etc/prometheus/k8s/token
+    kubernetes_sd_configs:
+      - role: node
+        api_server: https://10.20.20.99:6443        # ← FIXED
+        tls_config:
+          ca_file: /etc/prometheus/k8s/ca.crt
+        bearer_token_file: /etc/prometheus/k8s/token
+    relabel_configs:
+      - action: labelmap
+        regex:  __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: 10.20.20.99:6443                # ← FIXED
+      - source_labels: [__meta_kubernetes_node_name]
+        regex:        (.+)
+        target_label: __metrics_path__
+        replacement:  /api/v1/nodes/${1}/proxy/metrics/cadvisor
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex:        '(container_tasks_state|container_memory_failures_total)'
+        action:       drop
 
-
-
-remote_write:
-  - url: "http://localhost:8086/api/v1/prom/write?org=monitoring&bucket=prometheus"
-    bearer_token_file: /etc/prometheus/influxdb_token
+  # ===========================================================================
+  # kube-state-metrics — pod ↔ deployment join + replica counts
+  # ===========================================================================
+  - job_name: 'kube_state_metrics'
+    scheme: https
+    tls_config:
+      ca_file: /etc/prometheus/k8s/ca.crt
+      insecure_skip_verify: true
+    bearer_token_file: /etc/prometheus/k8s/token
+    kubernetes_sd_configs:
+      - role: endpoints
+        api_server: https://10.20.20.99:6443
+        tls_config:
+          ca_file: /etc/prometheus/k8s/ca.crt
+        bearer_token_file: /etc/prometheus/k8s/token
+        namespaces:
+          names: [kube-system]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: kube-state-metrics;http-metrics
+      - target_label: __address__
+        replacement: 10.20.20.99:6443
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        target_label: __metrics_path__
+        regex: (.+);(.+);(.+)
+        replacement: /api/v1/namespaces/${1}/services/${2}:${3}/proxy/metrics
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: |
+          kube_pod_info|kube_pod_owner|kube_replicaset_owner|kube_pod_container_resource_limits|kube_pod_container_resource_requests|kube_pod_container_status_restarts_total|kube_pod_container_status_last_terminated_reason|kube_deployment_spec_replicas|kube_deployment_status_replicas|kube_deployment_status_replicas_available
+        action: keep

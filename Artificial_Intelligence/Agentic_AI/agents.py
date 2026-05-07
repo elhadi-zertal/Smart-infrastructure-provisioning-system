@@ -1,18 +1,12 @@
-from agno.agent import Agent, RunResponse
+from dotenv import load_dotenv
+load_dotenv()
+
+from agno.agent import Agent
+from agno.run.agent import RunOutput
 from agno.models.groq import Groq
+from agno.db.sqlite import SqliteDb
 from tools import READ_TOOLS
 import os
-from agno.db.sqlite import SqliteDb
-
-
-# ─────────────────────────────────────────────────────────────
-#  PLANNER AGENT — read-only Q&A assistant
-#
-#  The Planner answers admin questions about the cluster.
-#  It has no write tools and proposes no actions.
-#  All provisioning, scaling, migration, and deletion is
-#  handled exclusively by main.py.
-# ─────────────────────────────────────────────────────────────
 
 PLANNER_INSTRUCTIONS = """
 You are a cluster intelligence assistant for a Proxmox infrastructure
@@ -86,6 +80,7 @@ EXAMPLE QUESTIONS YOU HANDLE WELL
   "Is the warning queue empty?"
 """
 
+
 planner = Agent(
     model=Groq(
         id="llama-3.3-70b-versatile",
@@ -94,17 +89,12 @@ planner = Agent(
     tools=READ_TOOLS,
     instructions=PLANNER_INSTRUCTIONS,
     db=SqliteDb(db_file="./agent_memory.db"),
-    add_history_to_messages=True,
-    num_history_responses=6,
-    show_tool_calls=True,
-    markdown=True
+    add_history_to_context=True,
+    num_history_runs=6,
+    markdown=True,
+    debug_mode=True       # optional: replaces show_tool_calls for visibility
 )
 
-
 def run_planner(question: str) -> str:
-    """
-    Run the Planner agent and return its answer as a string.
-    No action parsing, no JSON extraction — just the answer.
-    """
-    response: RunResponse = planner.run(question)
+    response: RunOutput = planner.run(question)
     return response.content

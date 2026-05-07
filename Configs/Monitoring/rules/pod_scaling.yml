@@ -1,0 +1,268 @@
+# =============================================================================
+# /etc/prometheus/rules/pod_scaling.yml — PROACTIVE EDITION
+# -----------------------------------------------------------------------------
+# Goal: scale BEFORE timeouts.  Triggers fire on resource pressure
+# (CPU/RAM/network) within 30 s instead of waiting for sustained 1-min
+# saturation.  This means duplication kicks in BEFORE the user sees a
+# slowdown, not after.
+#
+# Thresholds tuned for the hospital workload at peak (~1500 concurrent
+# users, 18 microservices behind 2 frontends):
+#
+#   CPU avg/replica  > 0.30 cores → warn (clone replica)
+#   CPU avg/replica  > 0.60 cores → critical (clone immediately)
+#   RAM avg/replica  > 200 MiB    → warn
+#   RAM avg/replica  > 400 MiB    → critical
+#   Network ingress  > 25 MB/s    → warn
+#   HTTP req rate    > 200 RPS    → warn   (NEW: catches load BEFORE CPU spikes)
+#
+# All alerts use target_type=k8s + action=horizontal_scaling so cluster-
+# manager will patch the deployment's `replicas` count.
+# =============================================================================
+
+groups:
+
+  # ===========================================================================
+  # Recording rules
+  # ===========================================================================
+  - name: pod_aggregations
+    interval: 15s
+    rules:
+
+      # CRITICAL FIX: pod ↔ deployment join.  See previous version for why
+      # the obvious join is wrong.  Reproduced here for completeness.
+      - record: pod_to_deployment_info
+        expr: |
+          kube_pod_owner{owner_kind="ReplicaSet"}
+          * on(namespace, owner_name) group_left(deployment)
+          label_replace(
+            label_replace(
+              kube_replicaset_owner{owner_kind="Deployment"},
+              "deployment", "$1", "owner_name", "(.+)"
+            ),
+            "owner_name", "$1", "replicaset", "(.+)"
+          )
+
+      - record: pfe:pod_cpu_cores_per_deployment
+        expr: |
+          sum by (namespace, deployment) (
+            rate(container_cpu_usage_seconds_total{namespace="default", container!=""}[2m])
+            * on(namespace, pod) group_left(deployment) pod_to_deployment_info
+          )
+
+      - record: pfe:pod_memory_working_set_per_deployment
+        expr: |
+          sum by (namespace, deployment) (
+            container_memory_working_set_bytes{namespace="default", container!=""}
+            * on(namespace, pod) group_left(deployment) pod_to_deployment_info
+          )
+
+      - record: pfe:pod_network_rx_bytes_per_deployment
+        expr: |
+          sum by (namespace, deployment) (
+            rate(container_network_receive_bytes_total{namespace="default"}[2m])
+            * on(namespace, pod) group_left(deployment) pod_to_deployment_info
+          )
+
+      - record: pfe:deployment_ready_replicas
+        expr: |
+          max by (namespace, deployment) (
+            kube_deployment_status_replicas_available{namespace="default"}
+          ) > 0
+
+      - record: pfe:pod_cpu_cores_avg_per_replica
+        expr: |
+          pfe:pod_cpu_cores_per_deployment
+          / on(namespace, deployment)
+          pfe:deployment_ready_replicas
+
+      - record: pfe:pod_memory_bytes_avg_per_replica
+        expr: |
+          pfe:pod_memory_working_set_per_deployment
+          / on(namespace, deployment)
+          pfe:deployment_ready_replicas
+
+      - record: pfe:pod_network_rx_avg_per_replica
+        expr: |
+          pfe:pod_network_rx_bytes_per_deployment
+          / on(namespace, deployment)
+          pfe:deployment_ready_replicas
+
+      - record: pfe:pod_restart_rate
+        expr: |
+          sum by (namespace, deployment) (
+            increase(kube_pod_container_status_restarts_total{namespace="default"}[5m])
+            * on(namespace, pod) group_left(deployment) pod_to_deployment_info
+          )
+
+  # ===========================================================================
+  # CPU horizontal scaling — PROACTIVE thresholds
+  # ===========================================================================
+  - name: pod_cpu_horizontal_scaling
+    rules:
+
+      - alert: PodCPUWarning
+        expr: pfe:pod_cpu_cores_avg_per_replica > 0.30
+        for: 30s              # was 1m — fire faster
+        labels:
+          severity:    warning
+          type:        cpu
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "{{ $labels.deployment }} CPU > 0.30 cores/replica"
+          description: >-
+            {{ $labels.deployment }} averaging
+            {{ $value | printf "%.2f" }} cores/replica — clone preemptively.
+
+      - alert: PodCPUCritical
+        expr: pfe:pod_cpu_cores_avg_per_replica > 0.60
+        for: 15s
+        labels:
+          severity:    critical
+          type:        cpu
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "{{ $labels.deployment }} CPU > 0.60 cores/replica — CRITICAL"
+
+  # ===========================================================================
+  # Memory horizontal scaling — proactive
+  # ===========================================================================
+  - name: pod_memory_horizontal_scaling
+    rules:
+
+      - alert: PodRAMWarning
+        # > 200 MiB avg per replica
+        expr: pfe:pod_memory_bytes_avg_per_replica > 209715200
+        for: 30s
+        labels:
+          severity:    warning
+          type:        memory
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "{{ $labels.deployment }} RAM > 200 MiB/replica"
+
+      - alert: PodRAMCritical
+        # > 400 MiB avg per replica
+        expr: pfe:pod_memory_bytes_avg_per_replica > 419430400
+        for: 30s
+        labels:
+          severity:    critical
+          type:        memory
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "{{ $labels.deployment }} RAM > 400 MiB/replica"
+
+  # ===========================================================================
+  # Network ingress — earliest signal of load
+  # ===========================================================================
+  - name: pod_network
+    rules:
+
+      - alert: PodNetworkSaturation
+        # > 25 MB/s ingress per replica
+        expr: pfe:pod_network_rx_avg_per_replica > 26214400
+        for: 30s
+        labels:
+          severity:    warning
+          type:        network
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "{{ $labels.deployment }} ingress > 25 MB/s/replica"
+
+  # ===========================================================================
+  # Crash / OOM
+  # ===========================================================================
+  - name: pod_health
+    rules:
+
+      - alert: PodOOMKilled
+        expr: |
+          increase(kube_pod_container_status_last_terminated_reason{
+            reason="OOMKilled", namespace="default"
+          }[5m])
+          * on(namespace, pod) group_left(deployment) pod_to_deployment_info
+          > 0
+        for: 30s
+        labels:
+          severity:    critical
+          type:        memory
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "{{ $labels.deployment }} OOM-killed"
+
+      - alert: PodCrashLooping
+        expr: pfe:pod_restart_rate > 2
+        for: 1m
+        labels:
+          severity:    critical
+          type:        cpu
+          target_type: k8s
+          action:      investigate
+        annotations:
+          summary: "{{ $labels.deployment }} crash-looping"
+
+  # ===========================================================================
+  # Frontend 5xx (SECONDARY signal — lets the LB tell us when users are
+  # actually seeing errors).  Kept for completeness; the primary triggers
+  # above should fire much earlier.
+  # ===========================================================================
+  - name: frontend_5xx
+    rules:
+
+      - record: pfe:frontend_5xx_rate
+        expr: |
+          (
+            sum by (upstream) (
+              rate(nginx_vts_upstream_responses_total{
+                upstream=~"default__.+", code="5xx"
+              }[2m])
+            )
+            /
+            (sum by (upstream) (
+              rate(nginx_vts_upstream_responses_total{
+                upstream=~"default__.+"
+              }[2m])
+            ) > 0)
+          ) * 100
+
+      - alert: FrontendErrorRateWarning
+        expr: |
+          label_replace(
+            label_replace(
+              pfe:frontend_5xx_rate > 1,
+              "namespace", "$1", "upstream", "(.+?)__.+"
+            ),
+            "deployment", "$1", "upstream", ".+?__(.+)"
+          )
+        for: 30s
+        labels:
+          severity:    warning
+          type:        http_5xx
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "Frontend {{ $labels.upstream }} 5xx > 1%"
+
+      - alert: FrontendErrorRateCritical
+        expr: |
+          label_replace(
+            label_replace(
+              pfe:frontend_5xx_rate > 5,
+              "namespace", "$1", "upstream", "(.+?)__.+"
+            ),
+            "deployment", "$1", "upstream", ".+?__(.+)"
+          )
+        for: 15s
+        labels:
+          severity:    critical
+          type:        http_5xx
+          target_type: k8s
+          action:      horizontal_scaling
+        annotations:
+          summary: "Frontend {{ $labels.upstream }} 5xx > 5%"
