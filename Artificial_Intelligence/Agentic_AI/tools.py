@@ -60,7 +60,7 @@ def get_history_stats() -> dict:
 
 def get_xgboost_prediction() -> dict:
     """Returns the current cluster bottleneck class (CPU/RAM/IO/Energy/None), active fitness weights, confidence score, and feature importances."""
-    return requests.get(f"{BASE}/prediction").json()
+    return requests.get(f"{BASE}/predict-config").json()
 
 def get_approval_queue() -> list:
     """Returns all high-risk actions currently pending admin email approval, with their age and expiry time."""
